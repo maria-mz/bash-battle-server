@@ -8,14 +8,17 @@ import (
 )
 
 type Server struct {
-	config      ServerConfig
-	listener    net.Listener
-	connections []*Connection // TODO: Map ?
-	accepting   bool
+	config    ServerConfig
+	listener  net.Listener
+	conns     map[string]*Connection
+	accepting bool
 }
 
 func NewServer(config ServerConfig) *Server {
-	return &Server{config: config}
+	return &Server{
+		config: config,
+		conns:  make(map[string]*Connection),
+	}
 }
 
 func (server *Server) Start() error {
@@ -61,7 +64,7 @@ func (server *Server) acceptConnections() {
 }
 
 func (server *Server) recordConnection(conn *Connection) {
-	server.connections = append(server.connections, conn)
+	server.conns[conn.address] = conn
 }
 
 func (server *Server) Shutdown() {
@@ -74,7 +77,7 @@ func (server *Server) Shutdown() {
 	// connections are recorded while we are closing.
 	time.Sleep(1 * time.Second)
 
-	for _, conn := range server.connections {
+	for _, conn := range server.conns {
 		slog.Info("closing connection", "address", conn.address)
 
 		conn.StopReading()

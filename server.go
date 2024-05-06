@@ -47,7 +47,6 @@ func (s *Server) acceptConnections() {
 	for {
 		select {
 		case <-s.closing:
-			slog.Info("stopped accepting connections")
 			return
 		default:
 			conn, err := s.listener.Accept() // Blocking
@@ -98,8 +97,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 	}
 }
 
-func (server *Server) recordConnection(conn net.Conn) {
-	server.connections[conn.RemoteAddr().String()] = conn
+func (s *Server) recordConnection(conn net.Conn) {
+	s.connections[conn.RemoteAddr().String()] = conn
 }
 
 func (s *Server) Shutdown() {
@@ -107,7 +106,6 @@ func (s *Server) Shutdown() {
 	case <-s.closing:
 		slog.Info("server is already shut down!")
 	default:
-		slog.Info("shutting down server")
 		close(s.closing)
 	}
 }

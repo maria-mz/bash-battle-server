@@ -4,92 +4,110 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"time"
 )
 
 type Server struct {
-	config    ServerConfig
-	listener  net.Listener
-	conns     map[string]*Connection
-	accepting bool
+	config      ServerConfig
+	listener    net.Listener
+	connections map[string]net.Conn
+	closing     chan struct{}
+	messageBus  *MessageBus
 }
 
 func NewServer(config ServerConfig) *Server {
 	return &Server{
-		config: config,
-		conns:  make(map[string]*Connection),
+		config:      config,
+		connections: make(map[string]net.Conn),
+		closing:     make(chan struct{}),
+		messageBus:  NewMessageBus(),
 	}
 }
 
-func (server *Server) Start() error {
-	address := fmt.Sprintf("%s:%d", server.config.Host, server.config.Port)
+func (s *Server) Start() error {
+	address := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
 	listener, err := net.Listen("tcp", address)
 
 	if err != nil {
-		slog.Error("failed to start server", err)
 		return err
 	}
 
-	slog.Info("server is running!")
+	s.listener = listener
 
-	server.listener = listener
+	go s.messageBus.HandleIncomingMessages()
 
-	go server.acceptConnections()
+	go s.acceptConnections()
 
 	return nil
 }
 
-func (server *Server) acceptConnections() {
-	server.accepting = true
+func (s *Server) acceptConnections() {
+	defer s.listener.Close()
 
-	for server.accepting {
-		netConn, err := server.listener.Accept() // Blocking
+	for {
+		select {
+		case <-s.closing:
+			slog.Info("stopped accepting connections")
+			return
+		default:
+			conn, err := s.listener.Accept() // Blocking
 
-		if err != nil {
-			slog.Error("accept connection error", "err", err)
-			continue
+			if err != nil {
+				slog.Error(fmt.Sprintf("accept connection error: %v", err))
+				continue
+			}
+
+			s.onAcceptConnection(conn)
 		}
-
-		conn := NewConnection(netConn)
-
-		server.recordConnection(conn)
-
-		slog.Info("accepted new connection", "address", conn.address)
-
-		go conn.Read()
 	}
-
-	slog.Debug("stopped accepting connections")
 }
 
-func (server *Server) recordConnection(conn *Connection) {
-	server.conns[conn.address] = conn
+func (s *Server) onAcceptConnection(conn net.Conn) {
+	slog.Info(fmt.Sprintf("accepting new connection at %s", conn.RemoteAddr()))
+
+	s.recordConnection(conn)
+	go s.handleConnection(conn)
 }
 
-func (server *Server) Shutdown() {
-	slog.Info("shutting down server [start]")
+func (s *Server) handleConnection(conn net.Conn) {
+	defer conn.Close()
 
-	server.StopAccepting()
-	server.listener.Close()
+	buf := make([]byte, 1024)
+	addr := conn.RemoteAddr().String()
 
-	// Sleep for a bit to make sure accept loop exists, so no new
-	// connections are recorded while we are closing.
-	time.Sleep(1 * time.Second)
+	for {
+		select {
+		case <-s.closing:
+			return
+		default:
+			n, err := conn.Read(buf) // Blocking
 
-	for _, conn := range server.conns {
-		slog.Info("closing connection", "address", conn.address)
+			if err != nil {
+				slog.Error(fmt.Sprintf("read error for %s: %v", addr, err))
+				delete(s.connections, addr)
+				return
+			}
 
-		conn.StopReading()
-		conn.Close()
+			msg := Message{
+				address: conn.RemoteAddr().String(),
+				payload: buf[:n],
+			}
+
+			s.messageBus.PostMessage(msg)
+		}
 	}
-
-	slog.Info("shutting down server [done]")
 }
 
-func (server *Server) StopAccepting() {
-	if !server.accepting {
-		slog.Debug("server.accepting is already false")
+func (server *Server) recordConnection(conn net.Conn) {
+	server.connections[conn.RemoteAddr().String()] = conn
+}
+
+func (s *Server) Shutdown() {
+	select {
+	case <-s.closing:
+		slog.Info("server is already shut down!")
+	default:
+		slog.Info("shutting down server")
+		close(s.closing)
 	}
-	server.accepting = false
 }

@@ -17,7 +17,14 @@ func main() {
 	}
 
 	s := NewServer(config)
-	s.Start()
+	err = s.Start()
+
+	if err != nil {
+		slog.Error("failed to start server")
+		os.Exit(1)
+	}
+
+	slog.Info("server is running!")
 
 	time.Sleep(10 * time.Second)
 

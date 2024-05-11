@@ -12,7 +12,8 @@ type RoundNumber int
 const (
 	GAME_NOT_STARTED GameStatus = 0
 	GAME_IN_PROGRESS GameStatus = 1
-	GAME_OVER        GameStatus = 2
+	GAME_CANCELLED   GameStatus = 2
+	GAME_DONE        GameStatus = 3
 )
 
 type GameConfig struct {

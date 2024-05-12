@@ -5,8 +5,6 @@ import (
 	"sync"
 )
 
-// -- Client Record
-
 // ClientRecord represents a client's record in the client registry.
 type ClientRecord struct {
 	// ClientID uniquely identifies the client.
@@ -27,6 +25,14 @@ type ErrClientRecordExists struct {
 
 func (e ErrClientRecordExists) Error() string {
 	return fmt.Sprintf("record with client ID %s already exists", e.ClientID)
+}
+
+type ErrClientNotFound struct {
+	ClientID string
+}
+
+func (e ErrClientNotFound) Error() string {
+	return fmt.Sprintf("no client record found with client ID %s", e.ClientID)
 }
 
 type ErrPlayerNameTaken struct {
@@ -85,6 +91,16 @@ func (registry *ClientRegistry) RegisterClient(clientID string, name string) err
 	return nil
 }
 
+func (registry *ClientRegistry) GetPlayerName(clientID string) (string, error) {
+	record, ok := registry.getRecord(clientID)
+
+	if !ok {
+		return "", ErrClientNotFound{clientID}
+	}
+
+	return record.PlayerName, nil
+}
+
 // isPlayerNameTaken checks if the given player name is already in use.
 func (registry *ClientRegistry) isPlayerNameTaken(name string) bool {
 	_, ok := registry.playerNamesSet[name]
@@ -100,4 +116,9 @@ func (registry *ClientRegistry) addPlayerNameToSet(name string) {
 func (registry *ClientRegistry) HasRecord(clientID string) bool {
 	_, ok := registry.records[clientID]
 	return ok
+}
+
+func (registry *ClientRegistry) getRecord(clientID string) (*ClientRecord, bool) {
+	record, ok := registry.records[clientID]
+	return record, ok
 }

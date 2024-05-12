@@ -1,9 +1,7 @@
 package game
 
-type PlayerName string
-
 type Player struct {
-	Name  PlayerName
+	Name  string
 	Stats *PlayerStats
 }
 
@@ -17,7 +15,7 @@ type RoundStat struct {
 	Command string
 }
 
-func NewPlayer(name PlayerName) *Player {
+func NewPlayer(name string) *Player {
 	stats := &PlayerStats{
 		RoundStats: make(map[RoundNumber]*RoundStat),
 	}

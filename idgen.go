@@ -7,8 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type Token string
-
 func randomString(length int, charset string) string {
 	b := make([]byte, length)
 
@@ -19,8 +17,8 @@ func randomString(length int, charset string) string {
 	return string(b)
 }
 
-func GenerateNewToken() Token {
-	return Token(uuid.New().String())
+func GenerateNewToken() string {
+	return uuid.New().String()
 }
 
 func GenerateGameID() GameID {

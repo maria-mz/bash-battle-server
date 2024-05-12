@@ -1,32 +1,27 @@
 package main
 
-import (
-	"log/slog"
-	"os"
-	"time"
-)
-
-// Spins up server and lets it run for 10s
-// TODO: Run forever, close on ctrl+c or other signals
 func main() {
-	config, err := LoadConfig()
+	// lis, err := net.Listen("tcp", "127.0.0.1:5555")
 
-	if err != nil {
-		slog.Error("failed to load server config", err)
-		os.Exit(1)
-	}
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	s := NewServer(config)
-	err = s.Start()
+	// defer lis.Close()
 
-	if err != nil {
-		slog.Error("failed to start server")
-		os.Exit(1)
-	}
+	// serverRegistrar := grpc.NewServer()
 
-	slog.Info("server is running!")
+	// server := NewGameServer()
 
-	time.Sleep(10 * time.Second)
+	// proto.RegisterBashBattleServer(serverRegistrar, server)
 
-	s.Shutdown()
+	// slog.Info("starting server!")
+
+	// serverRegistrar.Serve(lis)
+
+	// time.Sleep(5 * time.Second)
+
+	// serverRegistrar.GracefulStop()
+
+	// slog.Info("stopped server gracefully :)")
 }

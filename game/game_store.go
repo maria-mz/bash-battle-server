@@ -31,13 +31,13 @@ type GameMeta struct {
 type GameStore struct {
 	config  GameConfig
 	meta    GameMeta
-	players map[PlayerName]*Player
+	players map[string]*Player
 }
 
 func NewGameStore(config GameConfig) *GameStore {
 	return &GameStore{
 		config:  config,
-		players: make(map[PlayerName]*Player),
+		players: make(map[string]*Player),
 	}
 }
 
@@ -68,7 +68,7 @@ func (store *GameStore) SetRoundNumber(num RoundNumber) {
 
 // AddPlayer adds a new player to the store with initial stats.
 // Returns an error if there is already a player with the same name.
-func (store *GameStore) AddPlayer(name PlayerName) error {
+func (store *GameStore) AddPlayer(name string) error {
 	_, ok := store.players[name]
 
 	if ok {
@@ -82,12 +82,12 @@ func (store *GameStore) AddPlayer(name PlayerName) error {
 }
 
 // DeletePlayer deletes a player and all their info from the store.
-func (store *GameStore) DeletePlayer(name PlayerName) {
+func (store *GameStore) DeletePlayer(name string) {
 	delete(store.players, name)
 }
 
 // GetPlayerScore gets a player's game score, and a success flag.
-func (store *GameStore) GetPlayerScore(name PlayerName) (GameScore, bool) {
+func (store *GameStore) GetPlayerScore(name string) (GameScore, bool) {
 	player, ok := store.players[name]
 
 	if !ok {
@@ -99,10 +99,7 @@ func (store *GameStore) GetPlayerScore(name PlayerName) (GameScore, bool) {
 
 // GetPlayerRoundStat gets the player's RoundStat for a particular round, and
 // a success flag.
-func (store *GameStore) GetPlayerRoundStat(
-	name PlayerName,
-	num RoundNumber,
-) (RoundStat, bool) {
+func (store *GameStore) GetPlayerRoundStat(name string, num RoundNumber) (RoundStat, bool) {
 	player, ok := store.players[name]
 
 	if !ok {
@@ -115,11 +112,7 @@ func (store *GameStore) GetPlayerRoundStat(
 
 // SetPlayerRoundStat sets the player's RoundStat for a particular round.
 // If the player isn't found, set is a no op and an error is returned.
-func (store *GameStore) SetPlayerRoundStat(
-	name PlayerName,
-	num RoundNumber,
-	stat RoundStat,
-) error {
+func (store *GameStore) SetPlayerRoundStat(name string, num RoundNumber, stat RoundStat) error {
 	player, ok := store.players[name]
 
 	if !ok {

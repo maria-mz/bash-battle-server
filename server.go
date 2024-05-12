@@ -1,111 +1,43 @@
 package main
 
 import (
-	"fmt"
-	"log/slog"
-	"net"
+	"context"
+
+	"github.com/maria-mz/bash-battle-proto/proto"
 )
 
-type Server struct {
-	config      ServerConfig
-	listener    net.Listener
-	connections map[string]net.Conn
-	closing     chan struct{}
-	messageBus  *MessageBus
+// GameServer represents the game server implementing the gRPC service.
+type GameServer struct {
+	proto.UnimplementedBashBattleServer
+
+	clientRegistry *ClientRegistry
 }
 
-func NewServer(config ServerConfig) *Server {
-	return &Server{
-		config:      config,
-		connections: make(map[string]net.Conn),
-		closing:     make(chan struct{}),
-		messageBus:  NewMessageBus(),
+// NewGameServer creates a new instance of GameServer.
+func NewGameServer(clientRegistry *ClientRegistry) *GameServer {
+	return &GameServer{
+		clientRegistry: clientRegistry,
 	}
 }
 
-func (s *Server) Start() error {
-	address := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
+// Login handles the client login request.
+func (s *GameServer) Login(ctx context.Context, request *proto.LoginRequest) (*proto.LoginResponse, error) {
+	token := GenerateNewToken()
+	clientID := ClientID(token)
 
-	listener, err := net.Listen("tcp", address)
+	err := s.clientRegistry.RegisterClient(clientID, request.Name)
 
 	if err != nil {
-		return err
-	}
-
-	s.listener = listener
-
-	go s.messageBus.HandleIncomingMessages()
-
-	go s.acceptConnections()
-
-	return nil
-}
-
-func (s *Server) acceptConnections() {
-	defer s.listener.Close()
-
-	for {
-		select {
-		case <-s.closing:
-			return
-		default:
-			conn, err := s.listener.Accept() // Blocking
-
-			if err != nil {
-				slog.Error(fmt.Sprintf("accept connection error: %v", err))
-				continue
-			}
-
-			s.onAcceptConnection(conn)
+		switch err.(type) {
+		case ErrPlayerNameTaken:
+			return &proto.LoginResponse{
+				Status: proto.LoginStatus_NameTaken,
+			}, nil
 		}
 	}
-}
 
-func (s *Server) onAcceptConnection(conn net.Conn) {
-	slog.Info(fmt.Sprintf("accepting new connection at %s", conn.RemoteAddr()))
-
-	s.recordConnection(conn)
-	go s.handleConnection(conn)
-}
-
-func (s *Server) handleConnection(conn net.Conn) {
-	defer conn.Close()
-
-	buf := make([]byte, 1024)
-	addr := conn.RemoteAddr().String()
-
-	for {
-		select {
-		case <-s.closing:
-			return
-		default:
-			n, err := conn.Read(buf) // Blocking
-
-			if err != nil {
-				slog.Error(fmt.Sprintf("read error for %s: %v", addr, err))
-				delete(s.connections, addr)
-				return
-			}
-
-			msg := Message{
-				address: conn.RemoteAddr().String(),
-				payload: buf[:n],
-			}
-
-			s.messageBus.PostMessage(msg)
-		}
-	}
-}
-
-func (s *Server) recordConnection(conn net.Conn) {
-	s.connections[conn.RemoteAddr().String()] = conn
-}
-
-func (s *Server) Shutdown() {
-	select {
-	case <-s.closing:
-		slog.Info("server is already shut down!")
-	default:
-		close(s.closing)
-	}
+	return &proto.LoginResponse{
+		Status: proto.LoginStatus_LoginSuccess,
+		Token:  token,
+	}, nil
 }

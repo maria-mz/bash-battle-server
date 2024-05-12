@@ -7,24 +7,22 @@ import (
 
 // -- Client Record
 
-type ClientID string
-
-// ClientRecord represents a client's record in the registry.
+// ClientRecord represents a client's record in the client registry.
 type ClientRecord struct {
 	// ClientID uniquely identifies the client.
-	ClientID ClientID
+	ClientID string
 
 	// PlayerName is the name of the player associated with the client.
 	PlayerName string
 
 	// JoinedGameID is the ID of the game the client has joined, if any.
-	JoinedGameID *GameID
+	JoinedGameID *string
 }
 
 // -- Client Registry Errors
 
 type ErrClientRecordExists struct {
-	ClientID ClientID
+	ClientID string
 }
 
 func (e ErrClientRecordExists) Error() string {
@@ -44,7 +42,7 @@ func (e ErrPlayerNameTaken) Error() string {
 // on these records.
 type ClientRegistry struct {
 	// records maps ClientIDs to their corresponding ClientRecord.
-	records map[ClientID]*ClientRecord
+	records map[string]*ClientRecord
 
 	// playerNamesSet is a set of player names currently in use.
 	playerNamesSet map[string]struct{}
@@ -56,7 +54,7 @@ type ClientRegistry struct {
 // NewClientRegistry creates an empty ClientRegistry
 func NewClientRegistry() *ClientRegistry {
 	return &ClientRegistry{
-		records:        make(map[ClientID]*ClientRecord),
+		records:        make(map[string]*ClientRecord),
 		playerNamesSet: make(map[string]struct{}),
 	}
 }
@@ -64,7 +62,7 @@ func NewClientRegistry() *ClientRegistry {
 // RegisterClient creates a new client record in the registry.
 // If a record with the same client ID already exists, it returns an ErrClientRecordExists error.
 // If the player name is already in use, it returns an ErrPlayerNameTaken error.
-func (registry *ClientRegistry) RegisterClient(clientID ClientID, name string) error {
+func (registry *ClientRegistry) RegisterClient(clientID string, name string) error {
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 
@@ -99,7 +97,7 @@ func (registry *ClientRegistry) addPlayerNameToSet(name string) {
 }
 
 // HasRecord checks if there is a record for the given client ID.
-func (registry *ClientRegistry) HasRecord(clientID ClientID) bool {
+func (registry *ClientRegistry) HasRecord(clientID string) bool {
 	_, ok := registry.records[clientID]
 	return ok
 }

@@ -1,9 +1,19 @@
 package registry
 
 import (
+	"fmt"
+
 	"github.com/maria-mz/bash-battle-server/game"
 	id "github.com/maria-mz/bash-battle-server/idgen"
 )
+
+type ErrGameNotFound struct {
+	GameID string
+}
+
+func (e ErrGameNotFound) Error() string {
+	return fmt.Sprintf("no game record found with game ID %s", e.GameID)
+}
 
 // GameRecord represents a record of a game in the game registry.
 type GameRecord struct {
@@ -49,7 +59,26 @@ func (registry *GameRegistry) RegisterGame(config game.GameConfig) (string, stri
 }
 
 // GetGameCode returns the game code for a game, if the record exists.
-func (registry *GameRegistry) GetGameCode(id string) (string, bool) {
-	record, ok := registry.records[id]
+func (registry *GameRegistry) GetGameCode(gameID string) (string, bool) {
+	record, ok := registry.records[gameID]
 	return record.GameCode, ok
+}
+
+// AddPlayer adds a new player to the game identified by the given game ID.
+// It returns an error if the game does not exist.
+func (registry *GameRegistry) AddPlayer(gameID string, name string) error {
+	record, ok := registry.getRecord(gameID)
+
+	if !ok {
+		return ErrGameNotFound{gameID}
+	}
+
+	record.GameStore.AddPlayer(name)
+	return nil
+}
+
+// getRecord retrieves the game record for the given game ID, if it exists.
+func (registry *GameRegistry) getRecord(gameID string) (*GameRecord, bool) {
+	record, ok := registry.records[gameID]
+	return record, ok
 }

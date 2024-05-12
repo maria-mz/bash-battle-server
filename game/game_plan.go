@@ -32,3 +32,20 @@ func (plan *GamePlan) GetRoundInfo(num RoundNumber) (RoundInfo, bool) {
 	info, ok := plan.rounds[num]
 	return info, ok
 }
+
+// TODO: temporary, implement real functionality, randomly assign rounds
+func BuildTempGamePlan(rounds int) GamePlan {
+	plan := NewGamePlan()
+
+	info := RoundInfo{
+		Question:   "???",
+		InputFile:  "input.txt",
+		OutputFile: "output.txt",
+	}
+
+	for i := 0; i < rounds; i++ {
+		plan.AddRound(info)
+	}
+
+	return plan
+}

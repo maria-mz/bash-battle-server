@@ -11,7 +11,7 @@ import (
 func TestLogin_Success(t *testing.T) {
 	clientRegistry := reg.NewClientRegistry()
 
-	server := NewGameServer(clientRegistry)
+	server := NewServer(clientRegistry)
 
 	request := &proto.LoginRequest{Name: "test-player-name"}
 
@@ -35,7 +35,7 @@ func TestLogin_Success(t *testing.T) {
 func TestLogin_NameTaken(t *testing.T) {
 	clientRegistry := reg.NewClientRegistry()
 
-	server := NewGameServer(clientRegistry)
+	server := NewServer(clientRegistry)
 
 	request := &proto.LoginRequest{Name: "test-player-name"}
 

@@ -5,36 +5,28 @@ import (
 
 	"github.com/maria-mz/bash-battle-proto/proto"
 	reg "github.com/maria-mz/bash-battle-server/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
-// GameServer represents the game server implementing the gRPC service.
-type GameServer struct {
+// Server represents the game server implementing the gRPC service.
+type Server struct {
 	proto.UnimplementedBashBattleServer
 
 	clientRegistry *reg.ClientRegistry
 }
 
-// NewGameServer creates a new instance of GameServer.
-func NewGameServer(clientRegistry *reg.ClientRegistry) *GameServer {
-	return &GameServer{
+// NewServer creates a new instance of GameServer.
+func NewServer(clientRegistry *reg.ClientRegistry) *Server {
+	return &Server{
 		clientRegistry: clientRegistry,
 	}
 }
 
-// getInternalErr returns an internal server error as a gRPC status error.
-// Note, use for serious errors.
-func (s *GameServer) getInternalErr() error {
-	return status.Error(codes.Internal, "internal server error")
-}
-
 // Login handles the client login request.
-func (s *GameServer) Login(ctx context.Context, request *proto.LoginRequest) (*proto.LoginResponse, error) {
+func (s *Server) Login(ctx context.Context, in *proto.LoginRequest) (*proto.LoginResponse, error) {
 	token := GenerateNewToken()
 	clientID := reg.ClientID(token)
 
-	err := s.clientRegistry.RegisterClient(clientID, request.Name)
+	err := s.clientRegistry.RegisterClient(clientID, in.Name)
 
 	if err != nil {
 		switch err.(type) {
@@ -43,7 +35,7 @@ func (s *GameServer) Login(ctx context.Context, request *proto.LoginRequest) (*p
 				Status: proto.LoginStatus_NameTaken,
 			}, nil
 		default:
-			return nil, s.getInternalErr()
+			return &proto.LoginResponse{}, err
 		}
 	}
 

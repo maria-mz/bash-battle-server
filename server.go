@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	pb "github.com/maria-mz/bash-battle-proto/proto"
@@ -30,23 +31,27 @@ func NewServer(clientReg *rg.ClientRegistry, gameReg *rg.GameRegistry) *Server {
 	}
 }
 
-func (s *Server) getUnauthenticatedErr() error {
-	return status.Error(codes.Unauthenticated, "cannot identify client")
-}
-
-// getClientIDFromContext extracts the client ID from the context's metadata.
-// If the token is not found, it returns an error.
-func (s *Server) getClientIDFromContext(ctx context.Context) (string, error) {
+// authenticateClient extracts and validates the authorization token from the
+// context headers. Returns the token if valid, otherwise returns an error.
+func (s *Server) authenticateClient(ctx context.Context) (string, error) {
 	headers, _ := metadata.FromIncomingContext(ctx)
-	token := headers["authorization"]
+	auth := headers["authorization"]
 
-	if len(token) == 0 {
+	if len(auth) == 0 {
 		return "", errors.New("token not found")
 	}
 
-	id := token[0]
+	token := auth[0]
 
-	return id, nil
+	if !s.clientRegistry.HasRecord(token) {
+		return "", fmt.Errorf("unknown token %s", token)
+	}
+
+	return token, nil
+}
+
+func (s *Server) getUnauthenticatedErr() error {
+	return status.Error(codes.Unauthenticated, "cannot identify client")
 }
 
 // Login handles the client login request.
@@ -61,7 +66,7 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginRespo
 		switch err.(type) {
 
 		case rg.ErrPlayerNameTaken:
-			slog.Warn("login failed; name taken", "err", err)
+			slog.Warn("login failed", "err", err)
 			return &pb.LoginResponse{Status: pb.LoginStatus_NameTaken}, nil
 
 		default:
@@ -82,15 +87,10 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginRespo
 func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.CreateGameResponse, error) {
 	slog.Info("processing new create game request")
 
-	clientID, err := s.getClientIDFromContext(ctx)
+	_, err := s.authenticateClient(ctx)
 
 	if err != nil {
-		slog.Warn("failed to create game; client token not found")
-		return &pb.CreateGameResponse{}, s.getUnauthenticatedErr()
-	}
-
-	if !s.clientRegistry.HasRecord(clientID) {
-		slog.Warn("failed to create game; unknown client token")
+		slog.Warn("auth failed", "err", err)
 		return &pb.CreateGameResponse{}, s.getUnauthenticatedErr()
 	}
 

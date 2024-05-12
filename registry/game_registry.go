@@ -12,7 +12,28 @@ type ErrGameNotFound struct {
 }
 
 func (e ErrGameNotFound) Error() string {
-	return fmt.Sprintf("no game record found with game ID %s", e.GameID)
+	return fmt.Sprintf(
+		"no game record found with game ID '%s'", e.GameID,
+	)
+}
+
+type ErrInvalidCode struct {
+	GameID   string
+	GameCode string
+}
+
+func (e ErrInvalidCode) Error() string {
+	return fmt.Sprintf(
+		"attempted to join game '%s' with invalid game code '%s'",
+		e.GameCode,
+		e.GameID,
+	)
+}
+
+type ErrJoinAfterLobbyClosed struct{}
+
+func (e ErrJoinAfterLobbyClosed) Error() string {
+	return "attempted to join game with closed lobby"
 }
 
 // GameRecord represents a record of a game in the game registry.
@@ -64,17 +85,32 @@ func (registry *GameRegistry) GetGameCode(gameID string) (string, bool) {
 	return record.GameCode, ok
 }
 
-// AddPlayer adds a new player to the game identified by the given game ID.
-// It returns an error if the game does not exist.
-func (registry *GameRegistry) AddPlayer(gameID string, name string) error {
+// JoinGame adds a player to the specified game using their name.
+// Returns an error if the game is not found, if the code is invalid,
+// or if the game lobby is closed.
+func (registry *GameRegistry) JoinGame(gameID string, gameCode string, name string) error {
 	record, ok := registry.getRecord(gameID)
 
 	if !ok {
 		return ErrGameNotFound{gameID}
 	}
 
+	if gameCode != record.GameCode {
+		return ErrInvalidCode{gameID, gameCode}
+	}
+
+	if record.GameStore.GetGameStatus() != game.GAME_IN_LOBBY {
+		return ErrJoinAfterLobbyClosed{}
+	}
+
 	record.GameStore.AddPlayer(name)
 	return nil
+}
+
+// HasRecord checks if there is a record for the given game ID.
+func (registry *GameRegistry) HasRecord(gameID string) bool {
+	_, ok := registry.records[gameID]
+	return ok
 }
 
 // getRecord retrieves the game record for the given game ID, if it exists.

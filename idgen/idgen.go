@@ -1,4 +1,4 @@
-package main
+package idgen
 
 import (
 	"fmt"

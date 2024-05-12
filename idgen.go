@@ -21,7 +21,7 @@ func GenerateNewToken() string {
 	return uuid.New().String()
 }
 
-func GenerateGameID() GameID {
+func GenerateGameID() string {
 	chars := "ABCDEFGHIJKLMNOPQRSTUVWXZYabcdefghijklmnopqrstuvwxyz0123456789"
 
 	firstHalf := randomString(3, chars)
@@ -29,7 +29,7 @@ func GenerateGameID() GameID {
 
 	id := fmt.Sprintf("%s-%s", firstHalf, secondHalf)
 
-	return GameID(id)
+	return id
 }
 
 func GenerateGameCode() string {

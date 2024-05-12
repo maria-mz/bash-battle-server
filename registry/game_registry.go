@@ -1,4 +1,4 @@
-package main
+package registry
 
 import "github.com/maria-mz/bash-battle-server/game"
 

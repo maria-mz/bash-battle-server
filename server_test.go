@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
+	reg "github.com/maria-mz/bash-battle-server/registry"
 )
 
 func TestLogin_Success(t *testing.T) {
-	clientRegistry := NewClientRegistry()
+	clientRegistry := reg.NewClientRegistry()
 
 	server := NewGameServer(clientRegistry)
 
@@ -26,13 +27,13 @@ func TestLogin_Success(t *testing.T) {
 	}
 
 	// Check that a record was actually added
-	if !clientRegistry.HasRecord(ClientID(response.Token)) {
+	if !clientRegistry.HasRecord(reg.ClientID(response.Token)) {
 		t.Fatalf("expected client record to be in the registry")
 	}
 }
 
 func TestLogin_NameTaken(t *testing.T) {
-	clientRegistry := NewClientRegistry()
+	clientRegistry := reg.NewClientRegistry()
 
 	server := NewGameServer(clientRegistry)
 

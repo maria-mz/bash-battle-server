@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
+	reg "github.com/maria-mz/bash-battle-server/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -12,11 +13,11 @@ import (
 type GameServer struct {
 	proto.UnimplementedBashBattleServer
 
-	clientRegistry *ClientRegistry
+	clientRegistry *reg.ClientRegistry
 }
 
 // NewGameServer creates a new instance of GameServer.
-func NewGameServer(clientRegistry *ClientRegistry) *GameServer {
+func NewGameServer(clientRegistry *reg.ClientRegistry) *GameServer {
 	return &GameServer{
 		clientRegistry: clientRegistry,
 	}
@@ -31,13 +32,13 @@ func (s *GameServer) getInternalErr() error {
 // Login handles the client login request.
 func (s *GameServer) Login(ctx context.Context, request *proto.LoginRequest) (*proto.LoginResponse, error) {
 	token := GenerateNewToken()
-	clientID := ClientID(token)
+	clientID := reg.ClientID(token)
 
 	err := s.clientRegistry.RegisterClient(clientID, request.Name)
 
 	if err != nil {
 		switch err.(type) {
-		case ErrPlayerNameTaken:
+		case reg.ErrPlayerNameTaken:
 			return &proto.LoginResponse{
 				Status: proto.LoginStatus_NameTaken,
 			}, nil

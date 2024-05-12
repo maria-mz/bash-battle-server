@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // GameServer represents the game server implementing the gRPC service.
@@ -20,6 +22,12 @@ func NewGameServer(clientRegistry *ClientRegistry) *GameServer {
 	}
 }
 
+// getInternalErr returns an internal server error as a gRPC status error.
+// Note, use for serious errors.
+func (s *GameServer) getInternalErr() error {
+	return status.Error(codes.Internal, "internal server error")
+}
+
 // Login handles the client login request.
 func (s *GameServer) Login(ctx context.Context, request *proto.LoginRequest) (*proto.LoginResponse, error) {
 	token := GenerateNewToken()
@@ -33,6 +41,8 @@ func (s *GameServer) Login(ctx context.Context, request *proto.LoginRequest) (*p
 			return &proto.LoginResponse{
 				Status: proto.LoginStatus_NameTaken,
 			}, nil
+		default:
+			return nil, s.getInternalErr()
 		}
 	}
 

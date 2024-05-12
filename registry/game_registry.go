@@ -2,7 +2,7 @@ package registry
 
 import (
 	"github.com/maria-mz/bash-battle-server/game"
-	"github.com/maria-mz/bash-battle-server/idgen"
+	id "github.com/maria-mz/bash-battle-server/idgen"
 )
 
 // GameRecord represents a record of a game in the game registry.
@@ -33,8 +33,8 @@ func NewGameRegistry() *GameRegistry {
 // RegisterGame creates a new game record with a unique ID and code.
 // It returns the generated game ID and code.
 func (registry *GameRegistry) RegisterGame(config game.GameConfig) (string, string) {
-	gameID := idgen.GenerateGameID()
-	gameCode := idgen.GenerateGameCode()
+	gameID := id.GenerateGameID()
+	gameCode := id.GenerateGameCode()
 	store := game.NewGameStore(config)
 
 	record := &GameRecord{

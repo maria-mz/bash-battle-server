@@ -63,29 +63,21 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginRespo
 	err := s.clientRegistry.RegisterClient(token, in.Name)
 
 	if err != nil {
-		switch err.(type) {
+		slog.Warn("login failed", "err", err)
 
-		case rg.ErrPlayerNameTaken:
-			slog.Warn("login failed", "err", err)
-			return &pb.LoginResponse{Status: pb.LoginStatus_NameTaken}, nil
-
-		default:
-			slog.Error("login failed", "err", err)
-			return &pb.LoginResponse{}, err
-		}
+		return &pb.LoginResponse{
+			ErrorCode: pb.LoginResponse_NAME_TAKEN_ERR,
+		}, nil
 	}
 
 	slog.Info("new player logged in successfully", "token", token, "name", in.Name)
 
-	return &pb.LoginResponse{
-		Status: pb.LoginStatus_LoginSuccess,
-		Token:  token,
-	}, nil
+	return &pb.LoginResponse{Token: token}, nil
 }
 
 // CreateGame handles the client create game request.
 func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.CreateGameResponse, error) {
-	slog.Info("processing new create game request")
+	slog.Info("processing create game request")
 
 	_, err := s.authenticateClient(ctx)
 
@@ -99,7 +91,7 @@ func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.
 
 	config := game.GameConfig{
 		Plan:         plan,
-		RoundSeconds: int(in.GameConfig.RoundMinutes), // TODO: seconds
+		RoundSeconds: int(in.GameConfig.RoundSeconds),
 	}
 
 	gameID, gameCode := s.gameRegistry.RegisterGame(config)
@@ -107,7 +99,48 @@ func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.
 	slog.Info("game created successfully", "id", gameID, "code", gameCode)
 
 	return &pb.CreateGameResponse{
-		GameId:   gameID,
+		GameID:   gameID,
 		GameCode: gameCode,
 	}, nil
+}
+
+func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.JoinGameResponse, error) {
+	slog.Info("processing join game request")
+
+	clientID, err := s.authenticateClient(ctx)
+
+	if err != nil {
+		slog.Warn("auth failed", "err", err)
+		return &pb.JoinGameResponse{}, s.getUnauthenticatedErr()
+	}
+
+	playerName, _ := s.clientRegistry.GetPlayerName(clientID)
+
+	err = s.gameRegistry.JoinGame(in.GameID, in.GameCode, playerName)
+
+	switch e := err.(type) {
+
+	case rg.ErrGameNotFound:
+		slog.Warn("game not found", "err", e)
+
+		return &pb.JoinGameResponse{
+			ErrorCode: pb.JoinGameResponse_GAME_NOT_FOUND_ERR,
+		}, nil
+
+	case rg.ErrInvalidCode:
+		slog.Warn("invalid code", "err", e)
+
+		return &pb.JoinGameResponse{
+			ErrorCode: pb.JoinGameResponse_INVALID_CODE_ERR,
+		}, nil
+
+	case rg.ErrJoinAfterLobbyClosed:
+		slog.Warn("lobby closed", "err", e)
+
+		return &pb.JoinGameResponse{
+			ErrorCode: pb.JoinGameResponse_GAME_LOBBY_CLOSED_ERR,
+		}, nil
+	}
+
+	return &pb.JoinGameResponse{}, nil
 }

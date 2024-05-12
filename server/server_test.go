@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -10,46 +10,45 @@ import (
 
 func TestLogin_Success(t *testing.T) {
 	clientRegistry := reg.NewClientRegistry()
+	gameRegistry := reg.NewGameRegistry()
 
-	server := NewServer(clientRegistry)
+	server := NewServer(clientRegistry, gameRegistry)
 
-	request := &proto.LoginRequest{Name: "test-player-name"}
+	request := &proto.LoginRequest{PlayerName: "test-player-name"}
 
 	response, err := server.Login(context.Background(), request)
-	t.Logf("response = %+v", response)
 
 	if err != nil {
 		t.Fatalf("expected no error but got %s", err)
 	}
 
-	if response.Status != proto.LoginStatus_LoginSuccess {
-		t.Fatalf("expected success login status")
+	if response.ErrorCode != proto.LoginResponse_UNSPECIFIED_ERR {
+		t.Fatalf("expected no error code")
 	}
 
 	// Check that a record was actually added
-	if !clientRegistry.HasRecord(reg.ClientID(response.Token)) {
+	if !clientRegistry.HasRecord(response.Token) {
 		t.Fatalf("expected client record to be in the registry")
 	}
 }
 
 func TestLogin_NameTaken(t *testing.T) {
 	clientRegistry := reg.NewClientRegistry()
+	gameRegistry := reg.NewGameRegistry()
 
-	server := NewServer(clientRegistry)
+	server := NewServer(clientRegistry, gameRegistry)
 
-	request := &proto.LoginRequest{Name: "test-player-name"}
+	request := &proto.LoginRequest{PlayerName: "test-player-name"}
 
 	server.Login(context.Background(), request)
 	response, err := server.Login(context.Background(), request)
-
-	t.Logf("response = %+v", response)
 
 	if err != nil {
 		t.Fatalf("expected no error but got %s", err)
 	}
 
-	if response.Status != proto.LoginStatus_NameTaken {
-		t.Fatalf("expected name taken login status")
+	if response.ErrorCode != proto.LoginResponse_NAME_TAKEN_ERR {
+		t.Fatalf("expected name taken error code")
 	}
 
 	if response.Token != "" {

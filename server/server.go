@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -60,7 +60,7 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginRespo
 
 	token := id.GenerateNewToken()
 
-	err := s.clientRegistry.RegisterClient(token, in.Name)
+	err := s.clientRegistry.RegisterClient(token, in.PlayerName)
 
 	if err != nil {
 		slog.Warn("login failed", "err", err)
@@ -70,7 +70,7 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginRespo
 		}, nil
 	}
 
-	slog.Info("new player logged in successfully", "token", token, "name", in.Name)
+	slog.Info("new player logged in successfully", "token", token, "name", in.PlayerName)
 
 	return &pb.LoginResponse{Token: token}, nil
 }

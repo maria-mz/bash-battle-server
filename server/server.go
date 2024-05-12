@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Server represents the game server implementing the gRPC service.
+// Server implements the gRPC service interface for Bash Battle.
 type Server struct {
 	pb.UnimplementedBashBattleServer
 
@@ -70,7 +70,7 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginRespo
 		}, nil
 	}
 
-	slog.Info("new player logged in successfully", "token", token, "name", in.PlayerName)
+	slog.Info("new player logged in", "token", token, "name", in.PlayerName)
 
 	return &pb.LoginResponse{Token: token}, nil
 }
@@ -96,7 +96,7 @@ func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.
 
 	gameID, gameCode := s.gameRegistry.RegisterGame(config)
 
-	slog.Info("game created successfully", "id", gameID, "code", gameCode)
+	slog.Info("game created", "id", gameID, "code", gameCode)
 
 	return &pb.CreateGameResponse{
 		GameID:   gameID,
@@ -128,19 +128,23 @@ func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.Join
 		}, nil
 
 	case rg.ErrInvalidCode:
-		slog.Warn("invalid code", "err", e)
+		slog.Warn("game code is invalid", "err", e)
 
 		return &pb.JoinGameResponse{
 			ErrorCode: pb.JoinGameResponse_INVALID_CODE_ERR,
 		}, nil
 
 	case rg.ErrJoinAfterLobbyClosed:
-		slog.Warn("lobby closed", "err", e)
+		slog.Warn("game lobby is closed", "err", e)
 
 		return &pb.JoinGameResponse{
 			ErrorCode: pb.JoinGameResponse_GAME_LOBBY_CLOSED_ERR,
 		}, nil
 	}
+
+	slog.Info(
+		fmt.Sprintf("player '%s' joined game '%s'", playerName, in.GameID),
+	)
 
 	return &pb.JoinGameResponse{}, nil
 }

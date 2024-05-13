@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/maria-mz/bash-battle-server/game"
-	id "github.com/maria-mz/bash-battle-server/idgen"
+	"github.com/maria-mz/bash-battle-server/id"
 )
 
 type ErrGameNotFound struct {
@@ -25,8 +25,8 @@ type ErrInvalidCode struct {
 func (e ErrInvalidCode) Error() string {
 	return fmt.Sprintf(
 		"attempted to join game '%s' with invalid game code '%s'",
-		e.GameCode,
 		e.GameID,
+		e.GameCode,
 	)
 }
 

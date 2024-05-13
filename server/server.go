@@ -8,7 +8,7 @@ import (
 
 	pb "github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/game"
-	id "github.com/maria-mz/bash-battle-server/idgen"
+	"github.com/maria-mz/bash-battle-server/id"
 	rg "github.com/maria-mz/bash-battle-server/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

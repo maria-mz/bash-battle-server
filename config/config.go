@@ -13,7 +13,7 @@ type ServerConfig struct {
 func LoadConfig() (ServerConfig, error) {
 	var config ServerConfig
 
-	file, err := os.Open("config.json")
+	file, err := os.Open("config/config.json")
 
 	if err != nil {
 		return config, err

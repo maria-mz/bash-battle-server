@@ -1,27 +1,86 @@
 package main
 
+import (
+	"fmt"
+	"log"
+	"net"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/maria-mz/bash-battle-proto/proto"
+	"github.com/maria-mz/bash-battle-server/config"
+	rg "github.com/maria-mz/bash-battle-server/registry"
+	srv "github.com/maria-mz/bash-battle-server/server"
+	"google.golang.org/grpc"
+)
+
+var listener net.Listener
+var server *srv.Server
+var serverRegistrar *grpc.Server
+
+func listen(host string, port uint16) {
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
+
+	if err != nil {
+		log.Fatalf("failed to listen: %s", err)
+	}
+
+	listener = lis
+}
+
+func initServer() {
+	server = srv.NewServer(rg.NewClientRegistry(), rg.NewGameRegistry())
+}
+
+func registerServer() {
+	serverRegistrar = grpc.NewServer()
+	proto.RegisterBashBattleServer(serverRegistrar, server)
+}
+
+func handleSignals() {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		sig := <-stop
+		log.Printf("received signal: %v, shutting down server...", sig)
+
+		serverRegistrar.GracefulStop()
+		listener.Close()
+		os.Exit(0)
+	}()
+}
+
+func startServer() {
+	err := serverRegistrar.Serve(listener)
+
+	if err != nil {
+		log.Fatalf("failed to serve: %s", err)
+	}
+}
+
 func main() {
-	// lis, err := net.Listen("tcp", "127.0.0.1:5555")
+	config, err := config.LoadConfig()
 
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err != nil {
+		log.Fatalf("failed to load server config: %s", err)
+	}
 
-	// defer lis.Close()
+	log.Printf(
+		"configuring server on host: %s, port: %d",
+		config.Host,
+		config.Port,
+	)
 
-	// serverRegistrar := grpc.NewServer()
+	listen(config.Host, config.Port)
+	defer listener.Close()
 
-	// server := NewGameServer()
+	initServer()
+	registerServer()
 
-	// proto.RegisterBashBattleServer(serverRegistrar, server)
+	handleSignals()
 
-	// slog.Info("starting server!")
-
-	// serverRegistrar.Serve(lis)
-
-	// time.Sleep(5 * time.Second)
-
-	// serverRegistrar.GracefulStop()
-
-	// slog.Info("stopped server gracefully :)")
+	log.Printf("starting server")
+	startServer()
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
+	"github.com/maria-mz/bash-battle-server/game"
 	reg "github.com/maria-mz/bash-battle-server/registry"
 	"google.golang.org/grpc/metadata"
 )
@@ -134,9 +135,80 @@ func TestCreateGame(t *testing.T) {
 		t.Errorf("response does not have game code")
 	}
 
-	ok := gameRegistry.HasRecord(gameResp.GameID)
-
-	if !ok {
+	if !gameRegistry.HasRecord(gameResp.GameID) {
 		t.Errorf("game not in registry!")
 	}
+}
+
+func TestJoinGame_Success(t *testing.T) {
+	clientRegistry := reg.NewClientRegistry()
+	gameRegistry := reg.NewGameRegistry()
+	server := NewServer(clientRegistry, gameRegistry)
+
+	gameID, gameCode := gameRegistry.RegisterGame(game.GameConfig{}) // empty ok for test
+
+	clientRegistry.RegisterClient(TEST_TOKEN, TEST_PLAYER_NAME)
+
+	ctx := getAuthContext(TEST_TOKEN)
+
+	joinReq := &proto.JoinGameRequest{
+		GameID:   gameID,
+		GameCode: gameCode,
+	}
+
+	joinResp, err := server.JoinGame(ctx, joinReq)
+
+	if err != nil {
+		t.Fatalf("expected no error but got %s", err)
+	}
+
+	if joinResp.ErrorCode != proto.JoinGameResponse_UNSPECIFIED_ERR {
+		t.Fatalf("wrong error code")
+	}
+}
+
+func TestJoinGame_Failed(t *testing.T) {
+	clientRegistry := reg.NewClientRegistry()
+	gameRegistry := reg.NewGameRegistry()
+	server := NewServer(clientRegistry, gameRegistry)
+
+	gameID, gameCode := gameRegistry.RegisterGame(game.GameConfig{}) // empty ok for test
+
+	clientRegistry.RegisterClient(TEST_TOKEN, TEST_PLAYER_NAME)
+
+	ctx := getAuthContext(TEST_TOKEN)
+
+	// Case 1: Game not found
+	joinReq := &proto.JoinGameRequest{
+		GameID:   "invalid-id",
+		GameCode: gameCode,
+	}
+
+	joinResp, err := server.JoinGame(ctx, joinReq)
+
+	if err != nil {
+		t.Fatalf("expected no error but got %s", err)
+	}
+
+	if joinResp.ErrorCode != proto.JoinGameResponse_GAME_NOT_FOUND_ERR {
+		t.Fatalf("wrong error code")
+	}
+
+	// Case 2: Invalid code
+	joinReq = &proto.JoinGameRequest{
+		GameID:   gameID,
+		GameCode: "invalid-code",
+	}
+
+	joinResp, err = server.JoinGame(ctx, joinReq)
+
+	if err != nil {
+		t.Fatalf("expected no error but got %s", err)
+	}
+
+	if joinResp.ErrorCode != proto.JoinGameResponse_INVALID_CODE_ERR {
+		t.Fatalf("wrong error code")
+	}
+
+	// Case 3: Not in lobby, TODO...
 }

@@ -104,6 +104,7 @@ func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.
 	}, nil
 }
 
+// JoinGame handles the client join game request.
 func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.JoinGameResponse, error) {
 	slog.Info("processing join game request")
 
@@ -118,28 +119,23 @@ func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.Join
 
 	err = s.gameRegistry.JoinGame(in.GameID, in.GameCode, playerName)
 
-	switch e := err.(type) {
+	if err != nil {
+		slog.Warn("join failed", "err", err)
 
-	case rg.ErrGameNotFound:
-		slog.Warn("game not found", "err", e)
-
-		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_GAME_NOT_FOUND_ERR,
-		}, nil
-
-	case rg.ErrInvalidCode:
-		slog.Warn("game code is invalid", "err", e)
-
-		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_INVALID_CODE_ERR,
-		}, nil
-
-	case rg.ErrJoinAfterLobbyClosed:
-		slog.Warn("game lobby is closed", "err", e)
-
-		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_GAME_LOBBY_CLOSED_ERR,
-		}, nil
+		switch err.(type) {
+		case rg.ErrGameNotFound:
+			return &pb.JoinGameResponse{
+				ErrorCode: pb.JoinGameResponse_GAME_NOT_FOUND_ERR,
+			}, nil
+		case rg.ErrInvalidCode:
+			return &pb.JoinGameResponse{
+				ErrorCode: pb.JoinGameResponse_INVALID_CODE_ERR,
+			}, nil
+		case rg.ErrJoinAfterLobbyClosed:
+			return &pb.JoinGameResponse{
+				ErrorCode: pb.JoinGameResponse_GAME_LOBBY_CLOSED_ERR,
+			}, nil
+		}
 	}
 
 	slog.Info(

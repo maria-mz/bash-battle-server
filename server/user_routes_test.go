@@ -19,8 +19,8 @@ type loginTest struct {
 }
 
 func (st loginTest) run(t *testing.T) {
-	games := reg.NewRegistry()
-	clients := reg.NewRegistry()
+	games := reg.NewRegistry[string, GameRecord]()
+	clients := reg.NewRegistry[string, ClientRecord]()
 
 	for _, game := range st.games {
 		games.WriteRecord(game)

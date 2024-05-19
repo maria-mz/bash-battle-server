@@ -20,8 +20,8 @@ type createGameTest struct {
 }
 
 func (st createGameTest) run(t *testing.T) {
-	games := reg.NewRegistry()
-	clients := reg.NewRegistry()
+	games := reg.NewRegistry[string, GameRecord]()
+	clients := reg.NewRegistry[string, ClientRecord]()
 
 	for _, game := range st.games {
 		games.WriteRecord(game)
@@ -94,8 +94,8 @@ type joinGameTest struct {
 }
 
 func (st joinGameTest) run(t *testing.T) {
-	games := reg.NewRegistry()
-	clients := reg.NewRegistry()
+	games := reg.NewRegistry[string, GameRecord]()
+	clients := reg.NewRegistry[string, ClientRecord]()
 
 	for _, game := range st.games {
 		games.WriteRecord(game)
@@ -124,6 +124,8 @@ func (st joinGameTest) run(t *testing.T) {
 			st.expectedResp.ErrorCode,
 		)
 	}
+
+	// TODO: check if in members
 }
 
 var joinGameTests = []joinGameTest{

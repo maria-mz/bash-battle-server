@@ -63,9 +63,9 @@ func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.Join
 		return &pb.JoinGameResponse{}, s.getUnauthenticatedErr()
 	}
 
-	client, _ := s.getClientRecord(clientID)
+	client, _ := s.clients.GetRecord(clientID)
 
-	game, ok := s.getGameRecord(in.GameID)
+	game, ok := s.games.GetRecord(in.GameID)
 
 	if !ok {
 		return &pb.JoinGameResponse{
@@ -79,7 +79,7 @@ func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.Join
 		}, nil
 	}
 
-	if game.GameStore.GetGameStatus() != state.GAME_IN_LOBBY {
+	if game.GameStore.GetGameStatus() != state.InLobby {
 		return &pb.JoinGameResponse{
 			ErrorCode: pb.JoinGameResponse_GAME_LOBBY_CLOSED_ERR,
 		}, nil

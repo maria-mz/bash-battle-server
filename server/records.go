@@ -8,7 +8,8 @@ import (
 type ClientRecord struct {
 	ClientID   string
 	PlayerName string
-	GameID     *string
+	// GameStats
+	GameID *string
 }
 
 func (record ClientRecord) ID() string {

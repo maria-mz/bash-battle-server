@@ -15,12 +15,15 @@ import (
 type Server struct {
 	pb.UnimplementedBashBattleServer
 
-	clients         *reg.Registry
-	games           *reg.Registry
+	clients         *reg.Registry[string, ClientRecord]
+	games           *reg.Registry[string, GameRecord]
 	registeredNames utils.StrSet
 }
 
-func NewServer(clients *reg.Registry, games *reg.Registry) *Server {
+func NewServer(
+	clients *reg.Registry[string, ClientRecord],
+	games *reg.Registry[string, GameRecord],
+) *Server {
 	s := &Server{
 		clients: clients,
 		games:   games,
@@ -33,8 +36,8 @@ func NewServer(clients *reg.Registry, games *reg.Registry) *Server {
 func (s *Server) getRegisteredNames() utils.StrSet {
 	set := utils.NewStrSet()
 
-	for _, rec := range s.clients.Records {
-		set.Add(rec.(ClientRecord).PlayerName)
+	for _, record := range s.clients.Records {
+		set.Add(record.PlayerName)
 	}
 
 	return set
@@ -59,20 +62,4 @@ func (s *Server) authenticateClient(ctx context.Context) (string, error) {
 
 func (s *Server) getUnauthenticatedErr() error {
 	return status.Error(codes.Unauthenticated, "unauthorized")
-}
-
-func (s *Server) getClientRecord(clientID string) (ClientRecord, bool) {
-	record, ok := s.clients.GetRecord(clientID)
-	if ok {
-		return record.(ClientRecord), ok
-	}
-	return ClientRecord{}, ok
-}
-
-func (s *Server) getGameRecord(gameID string) (GameRecord, bool) {
-	record, ok := s.games.GetRecord(gameID)
-	if ok {
-		return record.(GameRecord), ok
-	}
-	return GameRecord{}, ok
 }

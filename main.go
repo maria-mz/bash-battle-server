@@ -10,7 +10,7 @@ import (
 
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
-	rg "github.com/maria-mz/bash-battle-server/registry"
+	reg "github.com/maria-mz/bash-battle-server/registry"
 	srv "github.com/maria-mz/bash-battle-server/server"
 	"google.golang.org/grpc"
 )
@@ -30,7 +30,9 @@ func listen(host string, port uint16) {
 }
 
 func initServer() {
-	server = srv.NewServer(rg.NewClientRegistry(), rg.NewGameRegistry())
+	games := reg.NewRegistry()
+	clients := reg.NewRegistry()
+	server = srv.NewServer(games, clients)
 }
 
 func registerServer() {

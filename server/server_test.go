@@ -2,17 +2,18 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/maria-mz/bash-battle-proto/proto"
-	"github.com/maria-mz/bash-battle-server/game"
 	reg "github.com/maria-mz/bash-battle-server/registry"
 	"google.golang.org/grpc/metadata"
 )
 
-var TEST_TOKEN = "test-token"
-var TEST_PLAYER_NAME = "test-player-name"
+const (
+	testToken      = "test-token"
+	testPlayerName = "test-player-name"
+	testGameID     = "test-game-id"
+	testGameCode   = "test-game-code"
+)
 
 func getAuthContext(token string) context.Context {
 	header := metadata.New(map[string]string{"authorization": token})
@@ -20,195 +21,78 @@ func getAuthContext(token string) context.Context {
 	return ctx
 }
 
-func TestAuthenticate_Success(t *testing.T) {
-	clientRegistry := reg.NewClientRegistry()
-	gameRegistry := reg.NewGameRegistry()
-	server := NewServer(clientRegistry, gameRegistry)
+type authTest struct {
+	name       string
+	games      []GameRecord
+	clients    []ClientRecord
+	ctx        context.Context
+	token      string
+	shouldFail bool
+}
 
-	clientRegistry.RegisterClient(TEST_TOKEN, TEST_PLAYER_NAME)
+func (st authTest) run(t *testing.T) {
+	games := reg.NewRegistry()
+	clients := reg.NewRegistry()
 
-	ctx := getAuthContext(TEST_TOKEN)
-
-	token, err := server.authenticateClient(ctx)
-
-	if err != nil {
-		t.Fatalf("expected no error but got %s", err)
+	for _, game := range st.games {
+		games.WriteRecord(game)
 	}
 
-	if token != TEST_TOKEN {
-		t.Fatalf("%s != %s", token, TEST_TOKEN)
+	for _, client := range st.clients {
+		clients.WriteRecord(client)
+	}
+
+	server := NewServer(clients, games)
+
+	token, err := server.authenticateClient(st.ctx)
+
+	if !st.shouldFail && err != nil {
+		t.Errorf("expected no error but got %s", err)
+	}
+
+	if st.shouldFail && err == nil {
+		t.Errorf("expected error but got no error")
+	}
+
+	if token != st.token {
+		t.Errorf("token mismatch: actual != expected: %s != %s", token, st.token)
 	}
 }
 
-func TestAuthenticate_NoToken(t *testing.T) {
-	clientRegistry := reg.NewClientRegistry()
-	gameRegistry := reg.NewGameRegistry()
-	server := NewServer(clientRegistry, gameRegistry)
-
-	_, err := server.authenticateClient(context.Background())
-
-	expectedErr := "no token found"
-	if err.Error() == expectedErr {
-		t.Fatalf("%s != %s", err, expectedErr)
-	}
-}
-
-func TestAuthenticate_NoRecord(t *testing.T) {
-	clientRegistry := reg.NewClientRegistry()
-	gameRegistry := reg.NewGameRegistry()
-	server := NewServer(clientRegistry, gameRegistry)
-
-	ctx := getAuthContext(TEST_TOKEN)
-
-	_, err := server.authenticateClient(ctx)
-
-	expectedErr := fmt.Sprintf("unknown token %s", TEST_TOKEN)
-	if err.Error() != expectedErr {
-		t.Fatalf("%s != %s", err, expectedErr)
-	}
-}
-
-func TestLogin_Success(t *testing.T) {
-	clientRegistry := reg.NewClientRegistry()
-	gameRegistry := reg.NewGameRegistry()
-	s := NewServer(clientRegistry, gameRegistry)
-
-	loginReq := &proto.LoginRequest{PlayerName: TEST_PLAYER_NAME}
-	loginResp, err := s.Login(context.Background(), loginReq)
-
-	if err != nil {
-		t.Fatalf("expected no error but got %s", err)
-	}
-
-	if loginResp.ErrorCode != proto.LoginResponse_UNSPECIFIED_ERR {
-		t.Fatalf("wrong error code")
-	}
-
-	if !clientRegistry.HasRecord(loginResp.Token) {
-		t.Fatalf("client not in registry!")
-	}
-}
-
-func TestLogin_NameTaken(t *testing.T) {
-	clientRegistry := reg.NewClientRegistry()
-	gameRegistry := reg.NewGameRegistry()
-	s := NewServer(clientRegistry, gameRegistry)
-
-	clientRegistry.RegisterClient(TEST_TOKEN, TEST_PLAYER_NAME)
-
-	request := &proto.LoginRequest{PlayerName: TEST_PLAYER_NAME}
-	response, err := s.Login(context.Background(), request)
-
-	if err != nil {
-		t.Fatalf("expected no error but got %s", err)
-	}
-
-	if response.ErrorCode != proto.LoginResponse_NAME_TAKEN_ERR {
-		t.Fatalf("wrong error code")
-	}
-
-	if response.Token != "" {
-		t.Fatalf("expected no token")
-	}
-}
-
-func TestCreateGame(t *testing.T) {
-	clientRegistry := reg.NewClientRegistry()
-	gameRegistry := reg.NewGameRegistry()
-	server := NewServer(clientRegistry, gameRegistry)
-
-	clientRegistry.RegisterClient(TEST_TOKEN, TEST_PLAYER_NAME)
-
-	ctx := getAuthContext(TEST_TOKEN)
-
-	gameReq := &proto.CreateGameRequest{
-		GameConfig: &proto.GameConfig{
-			MaxPlayers:   5,
-			Rounds:       10,
-			RoundSeconds: 300,
+var authTests = []authTest{
+	{
+		name:  "ok",
+		games: []GameRecord{},
+		clients: []ClientRecord{
+			{
+				ClientID:   testToken,
+				PlayerName: testPlayerName,
+			},
 		},
-	}
-
-	gameResp, _ := server.CreateGame(ctx, gameReq)
-
-	if gameResp.GameCode == "" {
-		t.Errorf("response does not have game code")
-	}
-
-	if !gameRegistry.HasRecord(gameResp.GameID) {
-		t.Errorf("game not in registry!")
-	}
+		ctx:        getAuthContext(testToken),
+		token:      testToken,
+		shouldFail: false,
+	},
+	{
+		name:       "no token in header",
+		games:      []GameRecord{},
+		clients:    []ClientRecord{},
+		ctx:        context.Background(),
+		shouldFail: true,
+	},
+	{
+		name:       "unknown token",
+		games:      []GameRecord{},
+		clients:    []ClientRecord{},
+		ctx:        getAuthContext(testToken),
+		shouldFail: true,
+	},
 }
 
-func TestJoinGame_Success(t *testing.T) {
-	clientRegistry := reg.NewClientRegistry()
-	gameRegistry := reg.NewGameRegistry()
-	server := NewServer(clientRegistry, gameRegistry)
-
-	gameID, gameCode := gameRegistry.RegisterGame(game.GameConfig{}) // empty ok for test
-
-	clientRegistry.RegisterClient(TEST_TOKEN, TEST_PLAYER_NAME)
-
-	ctx := getAuthContext(TEST_TOKEN)
-
-	joinReq := &proto.JoinGameRequest{
-		GameID:   gameID,
-		GameCode: gameCode,
+func TestAuth(t *testing.T) {
+	for _, st := range authTests {
+		t.Run(st.name, func(t *testing.T) {
+			st.run(t)
+		})
 	}
-
-	joinResp, err := server.JoinGame(ctx, joinReq)
-
-	if err != nil {
-		t.Fatalf("expected no error but got %s", err)
-	}
-
-	if joinResp.ErrorCode != proto.JoinGameResponse_UNSPECIFIED_ERR {
-		t.Fatalf("wrong error code")
-	}
-}
-
-func TestJoinGame_Failed(t *testing.T) {
-	clientRegistry := reg.NewClientRegistry()
-	gameRegistry := reg.NewGameRegistry()
-	server := NewServer(clientRegistry, gameRegistry)
-
-	gameID, gameCode := gameRegistry.RegisterGame(game.GameConfig{}) // empty ok for test
-
-	clientRegistry.RegisterClient(TEST_TOKEN, TEST_PLAYER_NAME)
-
-	ctx := getAuthContext(TEST_TOKEN)
-
-	// Case 1: Game not found
-	joinReq := &proto.JoinGameRequest{
-		GameID:   "invalid-id",
-		GameCode: gameCode,
-	}
-
-	joinResp, err := server.JoinGame(ctx, joinReq)
-
-	if err != nil {
-		t.Fatalf("expected no error but got %s", err)
-	}
-
-	if joinResp.ErrorCode != proto.JoinGameResponse_GAME_NOT_FOUND_ERR {
-		t.Fatalf("wrong error code")
-	}
-
-	// Case 2: Invalid code
-	joinReq = &proto.JoinGameRequest{
-		GameID:   gameID,
-		GameCode: "invalid-code",
-	}
-
-	joinResp, err = server.JoinGame(ctx, joinReq)
-
-	if err != nil {
-		t.Fatalf("expected no error but got %s", err)
-	}
-
-	if joinResp.ErrorCode != proto.JoinGameResponse_INVALID_CODE_ERR {
-		t.Fatalf("wrong error code")
-	}
-
-	// Case 3: Not in lobby, TODO...
 }

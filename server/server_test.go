@@ -7,6 +7,7 @@ import (
 	pb "github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/game"
 	reg "github.com/maria-mz/bash-battle-server/registry"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -48,17 +49,13 @@ func (st authTest) run(t *testing.T) {
 
 	token, err := server.authenticateClient(st.ctx)
 
-	if !st.shouldFail && err != nil {
-		t.Errorf("expected no error but got %s", err)
+	if st.shouldFail {
+		assert.NotNil(t, err)
+	} else {
+		assert.Nil(t, err)
 	}
 
-	if st.shouldFail && err == nil {
-		t.Errorf("expected error but got no error")
-	}
-
-	if token != st.token {
-		t.Errorf("token mismatch: actual != expected: %s != %s", token, st.token)
-	}
+	assert.Equal(t, st.token, token)
 }
 
 var authTests = []authTest{
@@ -125,46 +122,15 @@ func (st loginTest) run(t *testing.T) {
 
 	resp, err := server.Login(context.Background(), st.request)
 
-	if err != st.expectedErr {
-		t.Errorf(
-			"err mismatch: actual != expected: %s != %s",
-			err,
-			st.expectedErr,
-		)
-	}
-
-	if st.expectedResp.ErrorCode == nil {
-		if resp.ErrorCode != nil {
-			t.Errorf(
-				"err code mismatch: actual != expected: %s != %s",
-				resp.ErrorCode,
-				st.expectedResp.ErrorCode,
-			)
-		}
-	} else {
-		if *resp.ErrorCode != *st.expectedResp.ErrorCode {
-			t.Errorf(
-				"err code mismatch: actual != expected: %s != %s",
-				resp.ErrorCode,
-				st.expectedResp.ErrorCode,
-			)
-		}
-	}
+	assert.Equal(t, st.expectedErr, err)
+	assert.Equal(t, st.expectedResp.ErrorCode, resp.ErrorCode)
 
 	if st.shouldFail {
-		if resp.Token != "" {
-			t.Errorf("token should be empty")
-		}
-		if clients.HasRecord(resp.Token) {
-			t.Errorf("there should not be a new client in the registry")
-		}
+		assert.Equal(t, resp.Token, "")
+		assert.False(t, clients.HasRecord(resp.Token))
 	} else {
-		if resp.Token == "" {
-			t.Errorf("token should not be empty")
-		}
-		if !clients.HasRecord(resp.Token) {
-			t.Errorf("a new client should've been added to the registry")
-		}
+		assert.NotEqual(t, resp.Token, "")
+		assert.True(t, clients.HasRecord(resp.Token))
 	}
 }
 
@@ -230,21 +196,9 @@ func (st createGameTest) run(t *testing.T) {
 
 	resp, err := server.CreateGame(st.ctx, st.request)
 
-	if err != st.expectedErr {
-		t.Errorf(
-			"err mismatch: actual != expected: %s != %s",
-			err,
-			st.expectedErr,
-		)
-	}
-
-	if resp.GameCode == "" {
-		t.Errorf("response does not have game code")
-	}
-
-	if !games.HasRecord(resp.GameID) {
-		t.Errorf("a new game should've been added to the registry")
-	}
+	assert.Equal(t, st.expectedErr, err)
+	assert.NotEqual(t, resp.GameCode, "")
+	assert.True(t, games.HasRecord(resp.GameID))
 }
 
 var createGameTests = []createGameTest{
@@ -304,31 +258,8 @@ func (st joinGameTest) run(t *testing.T) {
 
 	resp, err := server.JoinGame(st.ctx, st.request)
 
-	if err != st.expectedErr {
-		t.Errorf(
-			"err mismatch: actual != expected: %s != %s",
-			err,
-			st.expectedErr,
-		)
-	}
-
-	if st.expectedResp.ErrorCode == nil {
-		if resp.ErrorCode != nil {
-			t.Errorf(
-				"err code mismatch: actual != expected: %s != %s",
-				resp.ErrorCode,
-				st.expectedResp.ErrorCode,
-			)
-		}
-	} else {
-		if *resp.ErrorCode != *st.expectedResp.ErrorCode {
-			t.Errorf(
-				"err code mismatch: actual != expected: %s != %s",
-				resp.ErrorCode,
-				st.expectedResp.ErrorCode,
-			)
-		}
-	}
+	assert.Equal(t, st.expectedErr, err)
+	assert.Equal(t, st.expectedResp.ErrorCode, resp.ErrorCode)
 
 	// TODO: check if in members
 }

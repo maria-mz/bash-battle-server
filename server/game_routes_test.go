@@ -116,12 +116,22 @@ func (st joinGameTest) run(t *testing.T) {
 		)
 	}
 
-	if resp.ErrorCode != st.expectedResp.ErrorCode {
-		t.Errorf(
-			"err code mismatch: actual != expected: %s != %s",
-			resp.ErrorCode,
-			st.expectedResp.ErrorCode,
-		)
+	if st.expectedResp.ErrorCode == nil {
+		if resp.ErrorCode != nil {
+			t.Errorf(
+				"err code mismatch: actual != expected: %s != %s",
+				resp.ErrorCode,
+				st.expectedResp.ErrorCode,
+			)
+		}
+	} else {
+		if *resp.ErrorCode != *st.expectedResp.ErrorCode {
+			t.Errorf(
+				"err code mismatch: actual != expected: %s != %s",
+				resp.ErrorCode,
+				st.expectedResp.ErrorCode,
+			)
+		}
 	}
 
 	// TODO: check if in members
@@ -148,11 +158,9 @@ var joinGameTests = []joinGameTest{
 			GameID:   testGameID,
 			GameCode: testGameCode,
 		},
-		expectedResp: &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_UNSPECIFIED_ERR,
-		},
-		expectedErr: nil,
-		shouldFail:  false,
+		expectedResp: &pb.JoinGameResponse{ErrorCode: nil},
+		expectedErr:  nil,
+		shouldFail:   false,
 	},
 	{
 		name: "invalid code",
@@ -175,7 +183,7 @@ var joinGameTests = []joinGameTest{
 			GameCode: "some-invalid-code",
 		},
 		expectedResp: &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_INVALID_CODE_ERR,
+			ErrorCode: pb.JoinGameResponse_ErrInvalidCode.Enum(),
 		},
 		expectedErr: nil,
 		shouldFail:  true,
@@ -201,7 +209,7 @@ var joinGameTests = []joinGameTest{
 			GameCode: testGameCode,
 		},
 		expectedResp: &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_GAME_NOT_FOUND_ERR,
+			ErrorCode: pb.JoinGameResponse_ErrGameNotFound.Enum(),
 		},
 		expectedErr: nil,
 		shouldFail:  true,

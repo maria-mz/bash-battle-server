@@ -42,12 +42,22 @@ func (st loginTest) run(t *testing.T) {
 		)
 	}
 
-	if resp.ErrorCode != st.expectedResp.ErrorCode {
-		t.Errorf(
-			"err code mismatch: actual != expected: %s != %s",
-			resp.ErrorCode,
-			st.expectedResp.ErrorCode,
-		)
+	if st.expectedResp.ErrorCode == nil {
+		if resp.ErrorCode != nil {
+			t.Errorf(
+				"err code mismatch: actual != expected: %s != %s",
+				resp.ErrorCode,
+				st.expectedResp.ErrorCode,
+			)
+		}
+	} else {
+		if *resp.ErrorCode != *st.expectedResp.ErrorCode {
+			t.Errorf(
+				"err code mismatch: actual != expected: %s != %s",
+				resp.ErrorCode,
+				st.expectedResp.ErrorCode,
+			)
+		}
 	}
 
 	if st.shouldFail {
@@ -69,15 +79,13 @@ func (st loginTest) run(t *testing.T) {
 
 var loginTests = []loginTest{
 	{
-		name:        "first client + ok",
-		games:       []GameRecord{},
-		clients:     []ClientRecord{},
-		request:     &pb.LoginRequest{PlayerName: testPlayerName},
-		expectedErr: nil,
-		expectedResp: &pb.LoginResponse{
-			ErrorCode: pb.LoginResponse_UNSPECIFIED_ERR,
-		},
-		shouldFail: false,
+		name:         "first client + ok",
+		games:        []GameRecord{},
+		clients:      []ClientRecord{},
+		request:      &pb.LoginRequest{PlayerName: testPlayerName},
+		expectedErr:  nil,
+		expectedResp: &pb.LoginResponse{ErrorCode: nil},
+		shouldFail:   false,
 	},
 	{
 		name:  "name taken",
@@ -91,7 +99,7 @@ var loginTests = []loginTest{
 		request:     &pb.LoginRequest{PlayerName: testPlayerName},
 		expectedErr: nil,
 		expectedResp: &pb.LoginResponse{
-			ErrorCode: pb.LoginResponse_NAME_TAKEN_ERR,
+			ErrorCode: pb.LoginResponse_ErrNameTaken.Enum(),
 			// Note: would add token... but it's random so can't really check it
 		},
 		shouldFail: true,

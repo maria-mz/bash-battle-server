@@ -25,6 +25,7 @@ func (err InvalidOp) Error() string {
 }
 
 type GameConfig struct {
+	Rounds       int
 	RoundSeconds int
 }
 

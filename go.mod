@@ -4,7 +4,7 @@ go 1.22.2
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/maria-mz/bash-battle-proto v0.0.0-20240512203845-81a5b73b0ff5
+	github.com/maria-mz/bash-battle-proto v0.0.0-20240520003722-71c5eeed5ce5
 	google.golang.org/grpc v1.63.2
 )
 

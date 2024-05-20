@@ -10,8 +10,8 @@ import (
 	"github.com/maria-mz/bash-battle-server/id"
 )
 
-func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.CreateGameResponse, error) {
-	slog.Info(fmt.Sprintf("processing create game request: %+v", in))
+func (s *Server) CreateGame(ctx context.Context, req *pb.CreateGameRequest) (*pb.CreateGameResponse, error) {
+	slog.Info(fmt.Sprintf("processing create game request: %+v", req))
 
 	_, err := s.authenticateClient(ctx)
 
@@ -20,12 +20,27 @@ func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.
 		return &pb.CreateGameResponse{}, s.getUnauthenticatedErr()
 	}
 
-	// TODO: Generate actual game plan!!!
-	plan := game.BuildTempGamePlan(int(in.GameConfig.Rounds))
-
 	config := game.GameConfig{
-		RoundSeconds: int(in.GameConfig.RoundSeconds),
+		Rounds:       int(req.GameConfig.Rounds),
+		RoundSeconds: int(req.GameConfig.RoundSeconds),
 	}
+
+	gameRec := s.createGame(config)
+	s.games.WriteRecord(gameRec)
+
+	resp := &pb.CreateGameResponse{
+		GameID:   gameRec.GameID,
+		GameCode: gameRec.Code,
+	}
+
+	slog.Info(fmt.Sprintf("fulfilled create game request: %+v", resp))
+
+	return resp, nil
+}
+
+func (s *Server) createGame(config game.GameConfig) GameRecord {
+	// TODO: Generate actual game plan!!!
+	plan := game.BuildTempGamePlan(config.Rounds)
 
 	gameID := id.GenerateGameID()
 	gameCode := id.GenerateGameCode()
@@ -36,20 +51,11 @@ func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.
 		Game:   game.NewGame(config, plan, func() {}),
 	}
 
-	s.games.WriteRecord(gameRec)
-
-	resp := &pb.CreateGameResponse{
-		GameID:   gameID,
-		GameCode: gameCode,
-	}
-
-	slog.Info(fmt.Sprintf("fulfilled create game request: %+v", resp))
-
-	return resp, nil
+	return gameRec
 }
 
-func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.JoinGameResponse, error) {
-	slog.Info(fmt.Sprintf("processing join game request: %+v", in))
+func (s *Server) JoinGame(ctx context.Context, req *pb.JoinGameRequest) (*pb.JoinGameResponse, error) {
+	slog.Info(fmt.Sprintf("processing join game request: %+v", req))
 
 	clientID, err := s.authenticateClient(ctx)
 
@@ -58,23 +64,23 @@ func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.Join
 		return &pb.JoinGameResponse{}, s.getUnauthenticatedErr()
 	}
 
-	gameRec, ok := s.games.GetRecord(in.GameID)
+	gameRec, ok := s.games.GetRecord(req.GameID)
 
 	if !ok {
 		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_GAME_NOT_FOUND_ERR,
+			ErrorCode: pb.JoinGameResponse_ErrGameNotFound.Enum(),
 		}, nil
 	}
 
-	if in.GameCode != gameRec.Code {
+	if req.GameCode != gameRec.Code {
 		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_INVALID_CODE_ERR,
+			ErrorCode: pb.JoinGameResponse_ErrInvalidCode.Enum(),
 		}, nil
 	}
 
 	if gameRec.Game.State != game.InLobby {
 		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_GAME_LOBBY_CLOSED_ERR,
+			ErrorCode: pb.JoinGameResponse_ErrJoinsClosed.Enum(),
 		}, nil
 	}
 

@@ -1,44 +1,44 @@
 package utils
 
-// StrSet represents a set of strings.
-type StrSet map[string]struct{}
+// Set represents a generic set.
+type Set[T comparable] map[T]struct{}
 
-// NewStrSet creates and returns a new empty StrSet.
-func NewStrSet() StrSet {
-	return make(StrSet)
+// NewSet creates and returns a new empty Set.
+func NewSet[T comparable]() Set[T] {
+	return make(Set[T])
 }
 
 // Add inserts an item into the set.
-func (s StrSet) Add(item string) {
+func (s Set[T]) Add(item T) {
 	s[item] = struct{}{}
 }
 
 // Delete removes an item from the set.
-func (s StrSet) Delete(item string) {
+func (s Set[T]) Delete(item T) {
 	delete(s, item)
 }
 
 // Contains checks if the set contains the specified item.
-func (s StrSet) Contains(item string) bool {
+func (s Set[T]) Contains(item T) bool {
 	_, ok := s[item]
 	return ok
 }
 
 // Size returns the number of items in the set.
-func (s StrSet) Size() int {
+func (s Set[T]) Size() int {
 	return len(s)
 }
 
 // Clear removes all items from the set.
-func (s StrSet) Clear() {
+func (s Set[T]) Clear() {
 	for k := range s {
 		delete(s, k)
 	}
 }
 
 // Items returns a slice containing all items in the set.
-func (s StrSet) Items() []string {
-	items := make([]string, 0, len(s))
+func (s Set[T]) Items() []T {
+	items := make([]T, 0, len(s))
 	for k := range s {
 		items = append(items, k)
 	}

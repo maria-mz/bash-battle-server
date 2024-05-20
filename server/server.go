@@ -17,7 +17,7 @@ type Server struct {
 
 	clients         *reg.Registry[string, ClientRecord]
 	games           *reg.Registry[string, GameRecord]
-	registeredNames utils.StrSet
+	registeredNames utils.Set[string]
 }
 
 func NewServer(
@@ -33,8 +33,8 @@ func NewServer(
 	return s
 }
 
-func (s *Server) getRegisteredNames() utils.StrSet {
-	set := utils.NewStrSet()
+func (s *Server) getRegisteredNames() utils.Set[string] {
+	set := utils.NewSet[string]()
 
 	for _, record := range s.clients.Records {
 		set.Add(record.PlayerName)

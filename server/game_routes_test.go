@@ -5,9 +5,8 @@ import (
 	"testing"
 
 	pb "github.com/maria-mz/bash-battle-proto/proto"
+	"github.com/maria-mz/bash-battle-server/game"
 	reg "github.com/maria-mz/bash-battle-server/registry"
-	"github.com/maria-mz/bash-battle-server/state"
-	"github.com/maria-mz/bash-battle-server/utils"
 )
 
 type createGameTest struct {
@@ -133,10 +132,9 @@ var joinGameTests = []joinGameTest{
 		name: "ok",
 		games: []GameRecord{
 			{
-				GameID:    testGameID,
-				GameCode:  testGameCode,
-				GameStore: state.NewGameStore(state.GameConfig{}),
-				Members:   utils.NewStrSet(),
+				GameID: testGameID,
+				Code:   testGameCode,
+				Game:   game.NewGame(game.GameConfig{}, game.GamePlan{}, func() {}),
 			},
 		},
 		clients: []ClientRecord{
@@ -160,10 +158,9 @@ var joinGameTests = []joinGameTest{
 		name: "invalid code",
 		games: []GameRecord{
 			{
-				GameID:    testGameID,
-				GameCode:  testGameCode,
-				GameStore: state.NewGameStore(state.GameConfig{}),
-				Members:   utils.NewStrSet(),
+				GameID: testGameID,
+				Code:   testGameCode,
+				Game:   game.NewGame(game.GameConfig{}, game.GamePlan{}, func() {}),
 			},
 		},
 		clients: []ClientRecord{
@@ -187,10 +184,9 @@ var joinGameTests = []joinGameTest{
 		name: "game not found",
 		games: []GameRecord{
 			{
-				GameID:    testGameID,
-				GameCode:  testGameCode,
-				GameStore: state.NewGameStore(state.GameConfig{}),
-				Members:   utils.NewStrSet(),
+				GameID: testGameID,
+				Code:   testGameCode,
+				Game:   game.NewGame(game.GameConfig{}, game.GamePlan{}, func() {}),
 			},
 		},
 		clients: []ClientRecord{

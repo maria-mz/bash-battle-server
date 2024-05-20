@@ -1,49 +1,49 @@
-package state
+package game
 
 type FilePath string
 
-type RoundInfo struct {
+type Round struct {
 	Question   string
 	InputFile  FilePath
 	OutputFile FilePath
 }
 
 type GamePlan struct {
-	rounds    map[RoundNumber]RoundInfo
+	rounds    map[int]Round
 	numRounds int
 }
 
 func NewGamePlan() GamePlan {
 	return GamePlan{
-		rounds: make(map[RoundNumber]RoundInfo),
+		rounds: make(map[int]Round),
 	}
 }
 
-func (plan *GamePlan) AddRound(round RoundInfo) {
+func (plan *GamePlan) AddRound(round Round) {
 	plan.numRounds++
-	plan.rounds[RoundNumber(plan.numRounds)] = round
+	plan.rounds[int(plan.numRounds)] = round
 }
 
 func (plan *GamePlan) GetNumRounds() int {
 	return plan.numRounds
 }
 
-func (plan *GamePlan) GetRoundInfo(num RoundNumber) (RoundInfo, bool) {
-	info, ok := plan.rounds[num]
+func (plan *GamePlan) GetRoundInfo(roundNumber int) (Round, bool) {
+	info, ok := plan.rounds[roundNumber]
 	return info, ok
 }
 
 // TODO: temporary, implement real functionality, randomly assign rounds
-func BuildTempGamePlan(rounds int) GamePlan {
+func BuildTempGamePlan(numRounds int) GamePlan {
 	plan := NewGamePlan()
 
-	info := RoundInfo{
+	info := Round{
 		Question:   "???",
 		InputFile:  "input.txt",
 		OutputFile: "output.txt",
 	}
 
-	for i := 0; i < rounds; i++ {
+	for i := 0; i < numRounds; i++ {
 		plan.AddRound(info)
 	}
 

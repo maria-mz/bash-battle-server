@@ -30,9 +30,9 @@ func listen(host string, port uint16) {
 }
 
 func initServer() {
-	games := reg.NewRegistry()
-	clients := reg.NewRegistry()
-	server = srv.NewServer(games, clients)
+	games := reg.NewRegistry[string, srv.GameRecord]()
+	clients := reg.NewRegistry[string, srv.ClientRecord]()
+	server = srv.NewServer(clients, games)
 }
 
 func registerServer() {

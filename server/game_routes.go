@@ -6,9 +6,8 @@ import (
 	"log/slog"
 
 	pb "github.com/maria-mz/bash-battle-proto/proto"
+	"github.com/maria-mz/bash-battle-server/game"
 	"github.com/maria-mz/bash-battle-server/id"
-	"github.com/maria-mz/bash-battle-server/state"
-	"github.com/maria-mz/bash-battle-server/utils"
 )
 
 func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.CreateGameResponse, error) {
@@ -22,26 +21,22 @@ func (s *Server) CreateGame(ctx context.Context, in *pb.CreateGameRequest) (*pb.
 	}
 
 	// TODO: Generate actual game plan!!!
-	plan := state.BuildTempGamePlan(int(in.GameConfig.Rounds))
+	plan := game.BuildTempGamePlan(int(in.GameConfig.Rounds))
 
-	config := state.GameConfig{
-		Plan:         plan,
+	config := game.GameConfig{
 		RoundSeconds: int(in.GameConfig.RoundSeconds),
 	}
 
 	gameID := id.GenerateGameID()
 	gameCode := id.GenerateGameCode()
-	store := state.NewGameStore(config)
-	members := utils.NewStrSet()
 
-	newGame := GameRecord{
-		GameID:    gameID,
-		GameCode:  gameCode,
-		GameStore: store,
-		Members:   members,
+	gameRec := GameRecord{
+		GameID: gameID,
+		Code:   gameCode,
+		Game:   game.NewGame(config, plan, func() {}),
 	}
 
-	s.games.WriteRecord(newGame)
+	s.games.WriteRecord(gameRec)
 
 	resp := &pb.CreateGameResponse{
 		GameID:   gameID,
@@ -63,9 +58,7 @@ func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.Join
 		return &pb.JoinGameResponse{}, s.getUnauthenticatedErr()
 	}
 
-	client, _ := s.clients.GetRecord(clientID)
-
-	game, ok := s.games.GetRecord(in.GameID)
+	gameRec, ok := s.games.GetRecord(in.GameID)
 
 	if !ok {
 		return &pb.JoinGameResponse{
@@ -73,23 +66,30 @@ func (s *Server) JoinGame(ctx context.Context, in *pb.JoinGameRequest) (*pb.Join
 		}, nil
 	}
 
-	if in.GameCode != game.GameCode {
+	if in.GameCode != gameRec.Code {
 		return &pb.JoinGameResponse{
 			ErrorCode: pb.JoinGameResponse_INVALID_CODE_ERR,
 		}, nil
 	}
 
-	if game.GameStore.GetGameStatus() != state.InLobby {
+	if gameRec.Game.State != game.InLobby {
 		return &pb.JoinGameResponse{
 			ErrorCode: pb.JoinGameResponse_GAME_LOBBY_CLOSED_ERR,
 		}, nil
 	}
 
-	client.GameID = &game.GameID
-	game.Members.Add(client.ClientID)
-
-	s.games.WriteRecord(game)
-	s.clients.WriteRecord(client)
+	clientRec, _ := s.clients.GetRecord(clientID)
+	s.addClientToGame(clientRec, gameRec)
 
 	return &pb.JoinGameResponse{}, nil
+}
+
+func (s *Server) addClientToGame(clientRec ClientRecord, gameRec GameRecord) {
+	clientRec.GameID = &gameRec.GameID
+
+	player := game.NewPlayer(clientRec.ClientID, clientRec.PlayerName)
+	gameRec.Game.Players.WriteRecord(player)
+
+	s.games.WriteRecord(gameRec)
+	s.clients.WriteRecord(clientRec)
 }

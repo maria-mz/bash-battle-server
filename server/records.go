@@ -1,15 +1,13 @@
 package server
 
 import (
-	"github.com/maria-mz/bash-battle-server/state"
-	"github.com/maria-mz/bash-battle-server/utils"
+	"github.com/maria-mz/bash-battle-server/game"
 )
 
 type ClientRecord struct {
 	ClientID   string
 	PlayerName string
-	// GameStats
-	GameID *string
+	GameID     *string
 }
 
 func (record ClientRecord) ID() string {
@@ -17,10 +15,9 @@ func (record ClientRecord) ID() string {
 }
 
 type GameRecord struct {
-	GameID    string
-	GameStore *state.GameStore
-	GameCode  string
-	Members   utils.StrSet
+	GameID string
+	Code   string
+	Game   game.Game
 }
 
 func (record GameRecord) ID() string {

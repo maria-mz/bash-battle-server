@@ -113,12 +113,7 @@ func (s *Server) validateLogin(request *proto.LoginRequest) *proto.LoginResponse
 func (s *Server) loginClient(request *proto.LoginRequest) *proto.LoginResponse {
 	token := utils.GenerateToken()
 
-	client := ClientRecord{
-		Token:     token,
-		Username:  request.Username,
-		GameStats: game.NewGameStats(),
-	}
-
+	client := NewClientRecord(token, request.Username)
 	s.clients.WriteRecord(client)
 	s.usedNames.Add(client.Username)
 

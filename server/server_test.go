@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
-	"github.com/maria-mz/bash-battle-server/game"
 	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/metadata"
@@ -14,8 +13,6 @@ import (
 const (
 	testToken    = "test-token"
 	testUsername = "test-player-name"
-	testGameID   = "test-game-id"
-	testGameCode = "test-game-code"
 )
 
 var testConfig = &proto.GameConfig{
@@ -141,12 +138,8 @@ var loginTests = []loginTest{
 		shouldFail:   false,
 	},
 	{
-		name: "name taken",
-		clients: []ClientRecord{{
-			Token:     testToken,
-			Username:  testUsername,
-			GameStats: game.NewGameStats(),
-		}},
+		name:         "name taken",
+		clients:      []ClientRecord{NewClientRecord(testToken, testUsername)},
 		request:      &proto.LoginRequest{Username: testUsername},
 		expectedErr:  nil,
 		expectedResp: &proto.LoginResponse{ErrorCode: proto.LoginResponse_ErrNameTaken.Enum()},

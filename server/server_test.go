@@ -18,12 +18,12 @@ const (
 	testGameCode = "test-game-code"
 )
 
-var testConfig = game.GameConfig{
+var testConfig = &proto.GameConfig{
 	MaxPlayers:   4,
 	Rounds:       10,
 	RoundSeconds: 300,
-	Difficulty:   game.VariedDiff,
-	FileSize:     game.VariedSize,
+	Difficulty:   proto.Difficulty_VariedDiff,
+	FileSize:     proto.FileSize_VariedSize,
 }
 
 func TestMain(m *testing.M) {

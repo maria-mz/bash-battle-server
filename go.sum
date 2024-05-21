@@ -18,6 +18,8 @@ github.com/maria-mz/bash-battle-proto v0.0.0-20240521180729-aff6d778a061 h1:k+L/
 github.com/maria-mz/bash-battle-proto v0.0.0-20240521180729-aff6d778a061/go.mod h1:hLnmwGMPXh02/l0XcSIgucTyoqttOzk45gFYlUO6iOY=
 github.com/maria-mz/bash-battle-proto v0.0.0-20240521201414-aa7088b9aeac h1:9gws2xIvmF5fze4sohDdSq/3dzTOlBQSs4rREd+gSpQ=
 github.com/maria-mz/bash-battle-proto v0.0.0-20240521201414-aa7088b9aeac/go.mod h1:hLnmwGMPXh02/l0XcSIgucTyoqttOzk45gFYlUO6iOY=
+github.com/maria-mz/bash-battle-proto v0.0.0-20240521214051-4581df7726ea h1:US+0CgbjLrmbmtOmdh8oaNvWzGOwirCiHXRcXJ/wwj0=
+github.com/maria-mz/bash-battle-proto v0.0.0-20240521214051-4581df7726ea/go.mod h1:hLnmwGMPXh02/l0XcSIgucTyoqttOzk45gFYlUO6iOY=
 github.com/mattn/go-isatty v0.0.18 h1:DOKFKCQ7FNG2L1rbrmstDN4QVRdS89Nkh85u68Uwp98=
 github.com/mattn/go-isatty v0.0.18/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mattn/go-runewidth v0.0.12/go.mod h1:RAqKPSqVFrSLVXbA8x7dzmKdmGzieGRCM46jaSJTDAk=

@@ -33,7 +33,7 @@ type Server struct {
 	mutex sync.Mutex
 }
 
-func NewServer(clients *Registry[string, ClientRecord], config game.GameConfig) *Server {
+func NewServer(clients *Registry[string, ClientRecord], config *proto.GameConfig) *Server {
 	// TODO: make game plan random
 	plan := game.BuildTempGamePlan(int(config.Rounds))
 
@@ -99,11 +99,11 @@ func (s *Server) validateLogin(request *proto.LoginRequest) *proto.LoginResponse
 		return proto.LoginResponse_ErrNameTaken.Enum()
 	}
 
-	if s.game.State != game.InLobby {
+	if s.game.State != proto.GameState_Lobby {
 		return proto.LoginResponse_ErrGameStarted.Enum()
 	}
 
-	if s.clients.Size() == s.game.Config.MaxPlayers {
+	if s.clients.Size() == int(s.game.Config.MaxPlayers) {
 		return proto.LoginResponse_ErrGameFull.Enum()
 	}
 
@@ -122,7 +122,11 @@ func (s *Server) loginClient(request *proto.LoginRequest) *proto.LoginResponse {
 	s.clients.WriteRecord(client)
 	s.usedNames.Add(client.Username)
 
-	response := &proto.LoginResponse{Token: token, Players: s.getPlayers()}
+	response := &proto.LoginResponse{
+		Token:      token,
+		Players:    s.getPlayers(),
+		GameConfig: s.game.Config,
+	}
 
 	log.Logger.Info(
 		"Successfully logged in client",

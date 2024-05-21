@@ -9,7 +9,6 @@ import (
 
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
-	"github.com/maria-mz/bash-battle-server/game"
 	"github.com/maria-mz/bash-battle-server/log"
 	srv "github.com/maria-mz/bash-battle-server/server"
 	"google.golang.org/grpc"
@@ -31,12 +30,12 @@ func listen(host string, port uint16) {
 
 func initServer() {
 	// TODO: take in flags
-	gameConfig := game.GameConfig{
+	gameConfig := &proto.GameConfig{
 		MaxPlayers:   4,
 		Rounds:       10,
 		RoundSeconds: 300,
-		Difficulty:   game.VariedDiff,
-		FileSize:     game.VariedSize,
+		Difficulty:   proto.Difficulty_VariedDiff,
+		FileSize:     proto.FileSize_VariedSize,
 	}
 
 	clients := srv.NewRegistry[string, srv.ClientRecord]()

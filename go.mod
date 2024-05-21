@@ -6,7 +6,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/charmbracelet/log v0.4.0
 	github.com/google/uuid v1.6.0
-	github.com/maria-mz/bash-battle-proto v0.0.0-20240521201414-aa7088b9aeac
+	github.com/maria-mz/bash-battle-proto v0.0.0-20240521214051-4581df7726ea
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/grpc v1.63.2
 )

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/maria-mz/bash-battle-proto/proto"
 )
 
 type InvalidOp struct {
@@ -15,9 +17,9 @@ func (err InvalidOp) Error() string {
 }
 
 type Game struct {
-	Config          GameConfig
+	State           proto.GameState
+	Config          *proto.GameConfig
 	Plan            GamePlan
-	State           GameState
 	CurrentRound    int
 	timer           time.Timer
 	roundInProgress bool
@@ -26,11 +28,11 @@ type Game struct {
 }
 
 // NewGame creates an initial game with no players.
-func NewGame(config GameConfig, plan GamePlan, onRoundDone func()) *Game {
+func NewGame(config *proto.GameConfig, plan GamePlan, onRoundDone func()) *Game {
 	return &Game{
 		Config:       config,
 		Plan:         plan,
-		State:        InLobby,
+		State:        proto.GameState_Lobby,
 		CurrentRound: 0,
 		onRoundDone:  onRoundDone,
 	}
@@ -40,7 +42,8 @@ func (game *Game) StartNextRound() error {
 	game.mutex.Lock()
 	defer game.mutex.Unlock()
 
-	if game.State == Cancelled || game.State == Done {
+	if game.State == proto.GameState_Cancelled ||
+		game.State == proto.GameState_Done {
 		return InvalidOp{"game is over; no rounds left to run"}
 	}
 
@@ -48,7 +51,7 @@ func (game *Game) StartNextRound() error {
 		return InvalidOp{"round is currently in progress!"}
 	}
 
-	game.State = InProgress
+	game.State = proto.GameState_InProgress
 
 	go game.runRound()
 
@@ -67,7 +70,7 @@ func (game *Game) runRound() {
 	game.onRoundDone()
 
 	if game.CurrentRound == game.Plan.GetNumRounds() {
-		game.State = Done
+		game.State = proto.GameState_Done
 	}
 
 	game.roundInProgress = false

@@ -111,7 +111,7 @@ func (s *Server) validateLogin(request *proto.LoginRequest) *proto.LoginResponse
 }
 
 func (s *Server) loginClient(request *proto.LoginRequest) *proto.LoginResponse {
-	token := GenerateNewToken()
+	token := utils.GenerateToken()
 
 	client := ClientRecord{
 		Token:     token,

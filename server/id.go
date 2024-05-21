@@ -1,4 +1,4 @@
-package id
+package server
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ func GenerateNewToken() string {
 }
 
 func GenerateGameID() string {
-	chars := "ABCDEFGHIJKLMNOPQRSTUVWXZYabcdefghijklmnopqrstuvwxyz0123456789"
+	chars := "abcdefghijklmnopqrstuvwxyz0123456789"
 
 	firstHalf := randomString(3, chars)
 	secondHalf := randomString(3, chars)
@@ -30,9 +30,4 @@ func GenerateGameID() string {
 	id := fmt.Sprintf("%s-%s", firstHalf, secondHalf)
 
 	return id
-}
-
-func GenerateGameCode() string {
-	chars := "0123456789"
-	return randomString(4, chars)
 }

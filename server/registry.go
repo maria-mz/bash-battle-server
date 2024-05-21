@@ -1,4 +1,4 @@
-package registry
+package server
 
 type IdentifiableRecord[T any] interface {
 	ID() T
@@ -32,8 +32,13 @@ func (reg *Registry[K, V]) WriteRecord(record V) {
 	reg.Records[record.ID()] = record
 }
 
-// DeleteRecord deletes a record matching the id. If matching record is found,
+// DeleteRecord deletes a record matching the id. If no matching record is found,
 // DeleteRecord is a no-op.
 func (reg *Registry[K, V]) DeleteRecord(id K) {
 	delete(reg.Records, id)
+}
+
+// Size returns the number of records in the registry.
+func (reg *Registry[K, V]) Size() int {
+	return len(reg.Records)
 }

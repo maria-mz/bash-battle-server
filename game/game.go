@@ -2,18 +2,8 @@ package game
 
 import (
 	"fmt"
+	"sync"
 	"time"
-
-	reg "github.com/maria-mz/bash-battle-server/registry"
-)
-
-type GameState int
-
-const (
-	InLobby    GameState = 0
-	InProgress GameState = 1
-	Cancelled  GameState = 2
-	Done       GameState = 3
 )
 
 type InvalidOp struct {
@@ -24,37 +14,41 @@ func (err InvalidOp) Error() string {
 	return err.Info
 }
 
-type GameConfig struct {
-	Rounds       int
-	RoundSeconds int
-}
-
 type Game struct {
-	Config       GameConfig
-	Plan         GamePlan
-	State        GameState
-	CurrentRound int
-	Players      reg.Registry[string, Player]
-	timer        time.Timer
-	onRoundDone  func()
+	Config          GameConfig
+	Plan            GamePlan
+	State           GameState
+	CurrentRound    int
+	timer           time.Timer
+	roundInProgress bool
+	onRoundDone     func()
+	mutex           sync.Mutex
 }
 
 // NewGame creates an initial game with no players.
-func NewGame(config GameConfig, plan GamePlan, onRoundDone func()) Game {
-	return Game{
+func NewGame(config GameConfig, plan GamePlan, onRoundDone func()) *Game {
+	return &Game{
 		Config:       config,
 		Plan:         plan,
 		State:        InLobby,
 		CurrentRound: 0,
-		Players:      *reg.NewRegistry[string, Player](),
 		onRoundDone:  onRoundDone,
 	}
 }
 
 func (game *Game) StartNextRound() error {
+	game.mutex.Lock()
+	defer game.mutex.Unlock()
+
 	if game.State == Cancelled || game.State == Done {
-		return InvalidOp{"cannot start next round if game is over"}
+		return InvalidOp{"game is over; no rounds left to run"}
 	}
+
+	if game.roundInProgress {
+		return InvalidOp{"round is currently in progress!"}
+	}
+
+	game.State = InProgress
 
 	go game.runRound()
 
@@ -62,6 +56,8 @@ func (game *Game) StartNextRound() error {
 }
 
 func (game *Game) runRound() {
+	game.roundInProgress = true
+
 	game.CurrentRound++
 
 	game.timer = *time.NewTimer(game.getRoundDuration()) // starts timer!
@@ -73,6 +69,8 @@ func (game *Game) runRound() {
 	if game.CurrentRound == game.Plan.GetNumRounds() {
 		game.State = Done
 	}
+
+	game.roundInProgress = false
 }
 
 func (game *Game) getRoundDuration() time.Duration {

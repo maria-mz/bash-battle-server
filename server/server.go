@@ -4,44 +4,52 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
+	"sync"
 
-	pb "github.com/maria-mz/bash-battle-proto/proto"
+	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/game"
-	"github.com/maria-mz/bash-battle-server/id"
-	reg "github.com/maria-mz/bash-battle-server/registry"
+	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/maria-mz/bash-battle-server/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
+// Server is the API for the BashBattle service.
+// Implements the gRPC `BashBattleServer` interface.
 type Server struct {
-	pb.UnimplementedBashBattleServer
+	proto.UnimplementedBashBattleServer
 
-	clients         *reg.Registry[string, ClientRecord]
-	games           *reg.Registry[string, GameRecord]
-	registeredNames utils.Set[string]
+	// Registry of clients connected to the server. Identified by token.
+	clients *Registry[string, ClientRecord]
+
+	// Set of usernames currently in use
+	usedNames utils.Set[string]
+
+	// Game instance managing the current game state
+	game *game.Game
+
+	// TODO: think about this mutex
+	mutex sync.Mutex
 }
 
-func NewServer(
-	clients *reg.Registry[string, ClientRecord],
-	games *reg.Registry[string, GameRecord],
-) *Server {
+func NewServer(clients *Registry[string, ClientRecord], config game.GameConfig) *Server {
+	// TODO: make game plan random
+	plan := game.BuildTempGamePlan(int(config.Rounds))
+
 	s := &Server{
 		clients: clients,
-		games:   games,
+		game:    game.NewGame(config, plan, func() {}),
 	}
-	s.registeredNames = s.getRegisteredNames()
-
+	s.usedNames = s.getUsedNames()
 	return s
 }
 
-func (s *Server) getRegisteredNames() utils.Set[string] {
+func (s *Server) getUsedNames() utils.Set[string] {
 	set := utils.NewSet[string]()
 
 	for _, record := range s.clients.Records {
-		set.Add(record.PlayerName)
+		set.Add(record.Username)
 	}
 
 	return set
@@ -68,115 +76,75 @@ func (s *Server) getUnauthenticatedErr() error {
 	return status.Error(codes.Unauthenticated, "unauthorized")
 }
 
-func (s *Server) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-	slog.Info(fmt.Sprintf("processing login request: %+v", req))
+func (s *Server) Login(ctx context.Context, request *proto.LoginRequest) (*proto.LoginResponse, error) {
+	log.Logger.Info("New login request", "username", request.Username)
 
-	if s.registeredNames.Contains(req.PlayerName) {
-		return &pb.LoginResponse{
-			ErrorCode: pb.LoginResponse_ErrNameTaken.Enum(),
-		}, nil
-	}
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
-	token := id.GenerateNewToken()
-
-	newClient := ClientRecord{
-		ClientID:   token,
-		PlayerName: req.PlayerName,
-	}
-
-	s.clients.WriteRecord(newClient)
-	s.registeredNames.Add(req.PlayerName)
-
-	resp := &pb.LoginResponse{Token: token}
-
-	slog.Info(fmt.Sprintf("fulfilled login request: %+v", resp))
-
-	return resp, nil
-}
-
-func (s *Server) CreateGame(ctx context.Context, req *pb.CreateGameRequest) (*pb.CreateGameResponse, error) {
-	slog.Info(fmt.Sprintf("processing create game request: %+v", req))
-
-	_, err := s.authenticateClient(ctx)
+	err := s.validateLogin(request)
 
 	if err != nil {
-		slog.Warn("auth failed", "err", err)
-		return &pb.CreateGameResponse{}, s.getUnauthenticatedErr()
+		log.Logger.Warn("Login failed", "reason", err)
+		return &proto.LoginResponse{ErrorCode: err}, nil
 	}
 
-	config := game.GameConfig{
-		Rounds:       int(req.GameConfig.Rounds),
-		RoundSeconds: int(req.GameConfig.RoundSeconds),
-	}
+	response := s.loginClient(request)
 
-	gameRec := s.createGame(config)
-	s.games.WriteRecord(gameRec)
-
-	resp := &pb.CreateGameResponse{
-		GameID:   gameRec.GameID,
-		GameCode: gameRec.Code,
-	}
-
-	slog.Info(fmt.Sprintf("fulfilled create game request: %+v", resp))
-
-	return resp, nil
+	return response, nil
 }
 
-func (s *Server) createGame(config game.GameConfig) GameRecord {
-	// TODO: Generate actual game plan!!!
-	plan := game.BuildTempGamePlan(config.Rounds)
-
-	gameRec := GameRecord{
-		GameID: id.GenerateGameID(),
-		Code:   id.GenerateGameCode(),
-		Game:   game.NewGame(config, plan, func() {}),
+func (s *Server) validateLogin(request *proto.LoginRequest) *proto.LoginResponse_ErrorCode {
+	if s.usedNames.Contains(request.Username) {
+		return proto.LoginResponse_ErrNameTaken.Enum()
 	}
 
-	return gameRec
+	if s.game.State != game.InLobby {
+		return proto.LoginResponse_ErrGameStarted.Enum()
+	}
+
+	if s.clients.Size() == s.game.Config.MaxPlayers {
+		return proto.LoginResponse_ErrGameFull.Enum()
+	}
+
+	return nil
 }
 
-func (s *Server) JoinGame(ctx context.Context, req *pb.JoinGameRequest) (*pb.JoinGameResponse, error) {
-	slog.Info(fmt.Sprintf("processing join game request: %+v", req))
+func (s *Server) loginClient(request *proto.LoginRequest) *proto.LoginResponse {
+	token := GenerateNewToken()
 
-	clientID, err := s.authenticateClient(ctx)
-
-	if err != nil {
-		slog.Warn("auth failed", "err", err)
-		return &pb.JoinGameResponse{}, s.getUnauthenticatedErr()
+	client := ClientRecord{
+		Token:     token,
+		Username:  request.Username,
+		GameStats: game.NewGameStats(),
 	}
 
-	gameRec, ok := s.games.GetRecord(req.GameID)
+	s.clients.WriteRecord(client)
+	s.usedNames.Add(client.Username)
 
-	if !ok {
-		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_ErrGameNotFound.Enum(),
-		}, nil
-	}
+	response := &proto.LoginResponse{Token: token, Players: s.getPlayers()}
 
-	if req.GameCode != gameRec.Code {
-		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_ErrInvalidCode.Enum(),
-		}, nil
-	}
+	log.Logger.Info(
+		"Successfully logged in client",
+		"username", request.Username,
+		"token", token,
+	)
 
-	if gameRec.Game.State != game.InLobby {
-		return &pb.JoinGameResponse{
-			ErrorCode: pb.JoinGameResponse_ErrJoinsClosed.Enum(),
-		}, nil
-	}
-
-	clientRec, _ := s.clients.GetRecord(clientID)
-	s.addClientToGame(clientRec, gameRec)
-
-	return &pb.JoinGameResponse{}, nil
+	return response
 }
 
-func (s *Server) addClientToGame(clientRec ClientRecord, gameRec GameRecord) {
-	clientRec.GameID = &gameRec.GameID
+func (s *Server) getPlayers() []*proto.Player {
+	players := make([]*proto.Player, 0, s.clients.Size())
 
-	player := game.NewPlayer(clientRec.ClientID, clientRec.PlayerName)
-	gameRec.Game.Players.WriteRecord(player)
+	for _, record := range s.clients.Records {
+		player := &proto.Player{
+			Username: record.Username,
+			Stats:    record.GameStats,
+		}
+		players = append(players, player)
+	}
 
-	s.games.WriteRecord(gameRec)
-	s.clients.WriteRecord(clientRec)
+	log.Logger.Debug(fmt.Sprintf("Players = %#v", players))
+
+	return players
 }

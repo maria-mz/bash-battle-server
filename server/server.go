@@ -154,19 +154,19 @@ func (s *Server) Stream(stream proto.BashBattle_StreamServer) error {
 	}
 
 	if client.Stream != nil {
-		log.Logger.Warn("Stream is already active")
-		return errors.New("stream is already active")
+		log.Logger.Warn("Stream is already running")
+		return errors.New("stream is already running")
 	}
 
 	client.Stream = stream
 
-	go s.runStream(client)
+	go s.recvStream(client)
 	err = s.handleEndOfStream(client)
 	return err
 }
 
-func (s *Server) runStream(client *ClientRecord) {
-	log.Logger.Info("Starting stream", "client", client.Token)
+func (s *Server) recvStream(client *ClientRecord) {
+	log.Logger.Info("Starting stream receive loop", "client", client.Username)
 
 	for {
 		_, err := client.Stream.Recv()
@@ -188,11 +188,11 @@ func (s *Server) handleEndOfStream(client *ClientRecord) error {
 
 	if msg.err != nil {
 		log.Logger.Warn(
-			"Stream ended due to error", "client", client.Token, "err", msg.err,
+			"Stream ended due to error", "client", client.Username, "err", msg.err,
 		)
 	} else {
 		log.Logger.Info(
-			"Stream ended gracefully", "client", client.Token, "info", msg.info,
+			"Stream ended gracefully", "client", client.Username, "info", msg.info,
 		)
 	}
 
@@ -214,7 +214,7 @@ func (s *Server) broadcast(event *proto.Event) {
 func (s *Server) sendEvent(event *proto.Event, client *ClientRecord) {
 	if client.Stream == nil {
 		log.Logger.Info(
-			"Skip sending event to client (no stream)", "client", client.Token,
+			"Skip sending event to client (no stream)", "client", client.Username,
 		)
 		return
 	}
@@ -223,12 +223,12 @@ func (s *Server) sendEvent(event *proto.Event, client *ClientRecord) {
 
 	if err != nil {
 		log.Logger.Warn(
-			"Failed to send event to client", "client", client.Token,
+			"Failed to send event to client", "client", client.Username,
 		)
 		client.EndStream <- EndStreamMsg{err: err}
 	} else {
 		log.Logger.Info(
-			"Successfully sent event to client", "client", client.Token,
+			"Successfully sent event to client", "client", client.Username,
 		)
 	}
 }

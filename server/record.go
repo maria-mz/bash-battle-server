@@ -2,6 +2,11 @@ package server
 
 import "github.com/maria-mz/bash-battle-proto/proto"
 
+type Stream interface {
+	Send(*proto.Event) error
+	Recv() (*proto.AwkMsg, error)
+}
+
 type EndStreamMsg struct {
 	info string
 	err  error
@@ -11,7 +16,7 @@ type ClientRecord struct {
 	Token     string
 	Username  string
 	GameStats *proto.GameStats
-	Stream    proto.BashBattle_StreamServer
+	Stream    Stream
 	EndStream chan EndStreamMsg
 }
 

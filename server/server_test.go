@@ -25,6 +25,7 @@ var testConfig = &proto.GameConfig{
 
 func TestMain(m *testing.M) {
 	log.InitLogger()
+	m.Run()
 }
 
 func getAuthContext(token string) context.Context {
@@ -35,7 +36,7 @@ func getAuthContext(token string) context.Context {
 
 type authTest struct {
 	name       string
-	clients    []ClientRecord
+	clients    []*ClientRecord
 	ctx        context.Context
 	token      string
 	shouldFail bool
@@ -45,26 +46,25 @@ func (test authTest) run(t *testing.T) {
 	clients := NewRegistry[string, ClientRecord]()
 
 	for _, client := range test.clients {
-		clients.WriteRecord(client)
+		clients.AddRecord(*client)
 	}
 
 	server := NewServer(clients, testConfig)
 
-	token, err := server.authenticateClient(test.ctx)
+	client, err := server.authenticateClient(test.ctx)
 
 	if test.shouldFail {
 		assert.NotNil(t, err)
 	} else {
 		assert.Nil(t, err)
+		assert.Equal(t, test.token, client.Token)
 	}
-
-	assert.Equal(t, test.token, token)
 }
 
 var authTests = []authTest{
 	{
 		name: "ok",
-		clients: []ClientRecord{
+		clients: []*ClientRecord{
 			{
 				Token:    testToken,
 				Username: testUsername,
@@ -76,13 +76,13 @@ var authTests = []authTest{
 	},
 	{
 		name:       "no token in header",
-		clients:    []ClientRecord{},
+		clients:    []*ClientRecord{},
 		ctx:        context.Background(),
 		shouldFail: true,
 	},
 	{
 		name:       "unknown token",
-		clients:    []ClientRecord{},
+		clients:    []*ClientRecord{},
 		ctx:        getAuthContext(testToken),
 		shouldFail: true,
 	},
@@ -98,7 +98,7 @@ func TestAuth(t *testing.T) {
 
 type loginTest struct {
 	name         string
-	clients      []ClientRecord
+	clients      []*ClientRecord
 	request      *proto.LoginRequest
 	expectedResp *proto.LoginResponse
 	expectedErr  error
@@ -109,7 +109,7 @@ func (test loginTest) run(t *testing.T) {
 	clients := NewRegistry[string, ClientRecord]()
 
 	for _, client := range test.clients {
-		clients.WriteRecord(client)
+		clients.AddRecord(*client)
 	}
 
 	server := NewServer(clients, testConfig)
@@ -130,8 +130,8 @@ func (test loginTest) run(t *testing.T) {
 
 var loginTests = []loginTest{
 	{
-		name:         "first client + ok",
-		clients:      []ClientRecord{},
+		name:         "first client",
+		clients:      []*ClientRecord{},
 		request:      &proto.LoginRequest{Username: testUsername},
 		expectedErr:  nil,
 		expectedResp: &proto.LoginResponse{ErrorCode: nil},
@@ -139,7 +139,7 @@ var loginTests = []loginTest{
 	},
 	{
 		name:         "name taken",
-		clients:      []ClientRecord{NewClientRecord(testToken, testUsername)},
+		clients:      []*ClientRecord{NewClientRecord(testToken, testUsername)},
 		request:      &proto.LoginRequest{Username: testUsername},
 		expectedErr:  nil,
 		expectedResp: &proto.LoginResponse{ErrorCode: proto.LoginResponse_ErrNameTaken.Enum()},

@@ -5,13 +5,13 @@ type IdentifiableRecord[T any] interface {
 }
 
 type Registry[K comparable, V IdentifiableRecord[K]] struct {
-	Records map[K]V
+	Records map[K]*V
 }
 
 // Registry creates an empty Registry
 func NewRegistry[K comparable, V IdentifiableRecord[K]]() *Registry[K, V] {
 	return &Registry[K, V]{
-		Records: make(map[K]V),
+		Records: make(map[K]*V),
 	}
 }
 
@@ -22,14 +22,14 @@ func (reg *Registry[K, V]) HasRecord(id K) bool {
 }
 
 // GetRecord returns a record matching the id, if it exists.
-func (reg *Registry[K, V]) GetRecord(id K) (V, bool) {
+func (reg *Registry[K, V]) GetRecord(id K) (*V, bool) {
 	record, ok := reg.Records[id]
 	return record, ok
 }
 
-// WriteRecord adds, or updates, a record in the registry.
-func (reg *Registry[K, V]) WriteRecord(record V) {
-	reg.Records[record.ID()] = record
+// WriteRecord adds a record to the registry (or updates if not careful).
+func (reg *Registry[K, V]) AddRecord(record V) {
+	reg.Records[record.ID()] = &record
 }
 
 // DeleteRecord deletes a record matching the id. If no matching record is found,

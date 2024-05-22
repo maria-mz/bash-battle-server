@@ -54,7 +54,7 @@ func handleSignals() {
 
 	go func() {
 		sig := <-stop
-		log.Logger.Info("Shutting down server", "signal", sig)
+		log.Logger.Info("Shutting down server gracefully", "signal", sig)
 
 		serverRegistrar.GracefulStop()
 		listener.Close()

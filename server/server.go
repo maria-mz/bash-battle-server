@@ -80,7 +80,7 @@ func (s *Server) Login(ctx context.Context, request *proto.LoginRequest) (*proto
 
 	if err != nil {
 		log.Logger.Warn("Login failed", "reason", err)
-		return &proto.LoginResponse{ErrorCode: err}, nil
+		return &proto.LoginResponse{}, err
 	}
 
 	response := s.loginClient(request)
@@ -88,17 +88,17 @@ func (s *Server) Login(ctx context.Context, request *proto.LoginRequest) (*proto
 	return response, nil
 }
 
-func (s *Server) validateLogin(request *proto.LoginRequest) *proto.LoginResponse_ErrorCode {
+func (s *Server) validateLogin(request *proto.LoginRequest) error {
 	if s.isNameTaken(request.Username) {
-		return proto.LoginResponse_ErrNameTaken.Enum()
+		return ErrNameTaken{request.Username}
 	}
 
 	if s.game.State != proto.GameState_Lobby {
-		return proto.LoginResponse_ErrGameStarted.Enum()
+		return ErrGameStarted{}
 	}
 
 	if s.clients.Size() == int(s.game.Config.MaxPlayers) {
-		return proto.LoginResponse_ErrGameFull.Enum()
+		return ErrGameFull{}
 	}
 
 	return nil

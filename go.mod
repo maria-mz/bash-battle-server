@@ -6,7 +6,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/charmbracelet/log v0.4.0
 	github.com/google/uuid v1.6.0
-	github.com/maria-mz/bash-battle-proto v0.0.0-20240521214051-4581df7726ea
+	github.com/maria-mz/bash-battle-proto v0.0.0-20240524001703-dddeda814a56
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/grpc v1.63.2
 )
@@ -22,6 +22,7 @@ require (
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect

@@ -97,12 +97,11 @@ func TestAuth(t *testing.T) {
 }
 
 type loginTest struct {
-	name         string
-	clients      []*ClientRecord
-	request      *proto.LoginRequest
-	expectedResp *proto.LoginResponse
-	expectedErr  error
-	shouldFail   bool
+	name        string
+	clients     []*ClientRecord
+	request     *proto.LoginRequest
+	expectedErr error
+	shouldFail  bool
 }
 
 func (test loginTest) run(t *testing.T) {
@@ -117,7 +116,6 @@ func (test loginTest) run(t *testing.T) {
 	resp, err := server.Login(context.Background(), test.request)
 
 	assert.Equal(t, test.expectedErr, err)
-	assert.Equal(t, test.expectedResp.ErrorCode, resp.ErrorCode)
 
 	if test.shouldFail {
 		assert.Equal(t, resp.Token, "")
@@ -130,20 +128,18 @@ func (test loginTest) run(t *testing.T) {
 
 var loginTests = []loginTest{
 	{
-		name:         "first client",
-		clients:      []*ClientRecord{},
-		request:      &proto.LoginRequest{Username: testUsername},
-		expectedErr:  nil,
-		expectedResp: &proto.LoginResponse{ErrorCode: nil},
-		shouldFail:   false,
+		name:        "first client",
+		clients:     []*ClientRecord{},
+		request:     &proto.LoginRequest{Username: testUsername},
+		expectedErr: nil,
+		shouldFail:  false,
 	},
 	{
-		name:         "name taken",
-		clients:      []*ClientRecord{NewClientRecord(testToken, testUsername)},
-		request:      &proto.LoginRequest{Username: testUsername},
-		expectedErr:  nil,
-		expectedResp: &proto.LoginResponse{ErrorCode: proto.LoginResponse_ErrNameTaken.Enum()},
-		shouldFail:   true,
+		name:        "name taken",
+		clients:     []*ClientRecord{NewClientRecord(testToken, testUsername)},
+		request:     &proto.LoginRequest{Username: testUsername},
+		expectedErr: ErrNameTaken{testUsername},
+		shouldFail:  true,
 	},
 }
 

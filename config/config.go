@@ -3,15 +3,18 @@ package config
 import (
 	"encoding/json"
 	"os"
+
+	"github.com/maria-mz/bash-battle-proto/proto"
 )
 
-type ServerConfig struct {
-	Host string `json:"host"`
-	Port uint16 `json:"port"`
+type Config struct {
+	Host       string            `json:"host"`
+	Port       uint16            `json:"port"`
+	GameConfig *proto.GameConfig `json:"gameConfig"`
 }
 
-func LoadConfig() (ServerConfig, error) {
-	var config ServerConfig
+func LoadConfig() (Config, error) {
+	var config Config
 
 	file, err := os.Open("config/config.json")
 

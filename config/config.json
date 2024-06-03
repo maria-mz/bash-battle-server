@@ -1,4 +1,11 @@
 {
   "host": "127.0.0.1",
-  "port": 5555
+  "port": 5555,
+  "gameConfig": {
+    "maxPlayers": 4,
+    "rounds": 10,
+    "roundSeconds": 300,
+    "difficulty": 0,
+    "fileSize": 0
+  }
 }

@@ -18,8 +18,8 @@ type Server struct {
 	clients *ClientRegistry
 	players *PlayerRegistry
 
-	streamer   *Streamer
-	streamMsgs <-chan StreamMsg
+	streamer           *Streamer
+	incomingStreamMsgs <-chan IncomingMsg
 
 	blueprint blueprint.Blueprint
 
@@ -29,17 +29,17 @@ type Server struct {
 
 func NewServer(config config.Config) *Server {
 	updates := make(chan fsm.FSMState)
-	streamMsgs := make(chan StreamMsg)
+	incomingStreamMsgs := make(chan IncomingMsg)
 
 	return &Server{
-		config:     config,
-		clients:    NewClientRegistry(),
-		players:    NewPlayerRegistry(),
-		streamer:   NewStreamer(streamMsgs),
-		streamMsgs: streamMsgs,
-		game:       fsm.NewFSM(config.GameConfig, updates),
-		blueprint:  blueprint.BuildBlueprint(config.GameConfig),
-		fsmUpdates: updates,
+		config:             config,
+		clients:            NewClientRegistry(),
+		players:            NewPlayerRegistry(),
+		streamer:           NewStreamer(incomingStreamMsgs),
+		incomingStreamMsgs: incomingStreamMsgs,
+		game:               fsm.NewFSM(config.GameConfig, updates),
+		blueprint:          blueprint.BuildBlueprint(config.GameConfig),
+		fsmUpdates:         updates,
 	}
 }
 
@@ -71,17 +71,10 @@ func (s *Server) Stream(token string, stream proto.BashBattle_StreamServer) erro
 	_, ok := s.clients.GetClient(token)
 
 	if !ok {
-		return errors.New("client not recognized")
+		return errors.New("token not recognized")
 	}
 
-	if s.streamer.IsStreamActive(token) {
-		return errors.New("stream is already running")
-	}
-
-	s.streamer.UnRegisterStream(token) // Make sure old stream is gone
-	s.streamer.RegisterStream(token, stream)
-
-	err := s.streamer.StartStreaming(token)
+	err := s.streamer.StartStreaming(token, stream)
 
 	return err
 }

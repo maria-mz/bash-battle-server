@@ -12,17 +12,14 @@ type EndStreamMsg struct {
 	err  error
 }
 
-type StreamMsg struct {
+type IncomingMsg struct {
 	sid string
 	msg *proto.AwkMsg
 }
 
 type Stream struct {
-	sid      string
-	isActive bool
-
+	sid       string
 	streamSrv proto.BashBattle_StreamServer
-
 	endStream chan EndStreamMsg
 }
 
@@ -34,7 +31,7 @@ func NewStream(sid string, streamServer proto.BashBattle_StreamServer) *Stream {
 	}
 }
 
-func (s *Stream) Receive(msgs chan<- StreamMsg) {
+func (s *Stream) Receive(msgs chan<- IncomingMsg) {
 	for {
 		msg, err := s.streamSrv.Recv()
 
@@ -48,24 +45,19 @@ func (s *Stream) Receive(msgs chan<- StreamMsg) {
 			return
 		}
 
-		msgs <- StreamMsg{sid: s.sid, msg: msg}
+		msgs <- IncomingMsg{sid: s.sid, msg: msg}
 	}
 }
 
 func (s *Stream) Send(event *proto.Event) {
-	if !s.isActive {
-		log.Logger.Warn("Stream isn't active; skipping send", "id", s.sid)
-		return
-	}
-
 	err := s.streamSrv.Send(event)
 
 	if err != nil {
-		log.Logger.Warn("Failed to send event to stream", "id", s.sid)
+		log.Logger.Warn("Failed to send event to stream", "sid", s.sid)
 
 		s.endStream <- EndStreamMsg{err: err}
 
 	} else {
-		log.Logger.Info("Successfully sent event to stream", "id", s.sid)
+		log.Logger.Info("Successfully sent event to stream", "sid", s.sid)
 	}
 }

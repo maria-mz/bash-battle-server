@@ -9,51 +9,26 @@ import (
 )
 
 type Streamer struct {
-	streams  *registry.Registry[string, Stream]
-	recvMsgs chan<- StreamMsg
+	streams      *registry.Registry[string, Stream]
+	incomingMsgs chan<- IncomingMsg
 }
 
-func NewStreamer(recvMsgs chan<- StreamMsg) *Streamer {
+func NewStreamer(incMsgs chan<- IncomingMsg) *Streamer {
 	return &Streamer{
-		streams:  registry.NewRegistry[string, Stream](),
-		recvMsgs: recvMsgs,
+		streams:      registry.NewRegistry[string, Stream](),
+		incomingMsgs: incMsgs,
 	}
 }
 
-func (s *Streamer) RegisterStream(sid string, streamServer proto.BashBattle_StreamServer) {
+func (s *Streamer) StartStreaming(sid string, streamServer proto.BashBattle_StreamServer) error {
+	if !s.streams.HasRecord(sid) {
+		return fmt.Errorf("stream with sid %s is already active", sid)
+	}
+
 	stream := NewStream(sid, streamServer)
 	s.streams.WriteRecord(sid, stream)
-}
 
-func (s *Streamer) HasStream(sid string) bool {
-	return s.streams.HasRecord(sid)
-}
-
-func (s *Streamer) IsStreamActive(sid string) bool {
-	stream, ok := s.streams.GetRecord(sid)
-
-	if !ok {
-		return false
-	}
-
-	return stream.isActive
-}
-
-func (s *Streamer) UnRegisterStream(sid string) {
-	// TODO: Need a way to stop recv stream loop ???
-	s.streams.DeleteRecord(sid)
-}
-
-func (s *Streamer) StartStreaming(sid string) error {
-	stream, ok := s.streams.GetRecord(sid)
-
-	if !ok {
-		return fmt.Errorf("no stream matching sid %s", sid)
-	}
-
-	stream.isActive = true
-
-	go stream.Receive(s.recvMsgs)
+	go stream.Receive(s.incomingMsgs)
 
 	msg := <-stream.endStream // blocking
 
@@ -67,7 +42,7 @@ func (s *Streamer) StartStreaming(sid string) error {
 		)
 	}
 
-	stream.isActive = false
+	s.streams.DeleteRecord(sid)
 
 	return msg.err
 }

@@ -37,6 +37,7 @@ type GameFSM struct {
 
 	updates chan<- FSMState
 
+	// This mutex ensures that only one player action is processed at time.
 	mutex sync.Mutex
 }
 
@@ -58,7 +59,7 @@ func (fsm *GameFSM) PlayerJoined(name string) {
 		return
 	}
 
-	if fsm.gameFull() {
+	if fsm.isGameFull() {
 		return
 	}
 
@@ -74,7 +75,7 @@ func (fsm *GameFSM) PlayerJoined(name string) {
 		"players", fsm.players.Size(),
 	)
 
-	if fsm.gameFull() {
+	if fsm.isGameFull() {
 		log.Logger.Info("Game is full, starting game!")
 		go fsm.runNextRound()
 	}
@@ -84,11 +85,11 @@ func (fsm *GameFSM) PlayerLeft(name string) {
 	fsm.mutex.Lock()
 	defer fsm.mutex.Unlock()
 
-	if fsm.gameEnded() {
+	if fsm.hasGameEnded() {
 		return
 	}
 
-	if fsm.gameEmpty() {
+	if fsm.isGameEmpty() {
 		return
 	}
 
@@ -112,7 +113,7 @@ func (fsm *GameFSM) PlayerLeft(name string) {
 		return
 	}
 
-	if fsm.gameAbandoned() {
+	if fsm.isGameAbandoned() {
 		log.Logger.Info("Game has been abandoned, terminating")
 		fsm.endGame(Terminated)
 		return
@@ -224,19 +225,19 @@ func (fsm *GameFSM) isCountingDownToFirstRound() bool {
 	return fsm.state == CountingDown && fsm.round == 1
 }
 
-func (fsm *GameFSM) gameFull() bool {
+func (fsm *GameFSM) isGameFull() bool {
 	return fsm.players.Size() == fsm.config.MaxPlayers
 }
 
-func (fsm *GameFSM) gameEmpty() bool {
+func (fsm *GameFSM) isGameEmpty() bool {
 	return fsm.players.Size() == 0
 }
 
-func (fsm *GameFSM) gameAbandoned() bool {
-	return fsm.players.Size() == 0 && fsm.state != WaitingForJoins
+func (fsm *GameFSM) isGameAbandoned() bool {
+	return fsm.isGameEmpty() && fsm.state != WaitingForJoins
 }
 
-func (fsm *GameFSM) gameEnded() bool {
+func (fsm *GameFSM) hasGameEnded() bool {
 	return fsm.state == Done || fsm.state == Terminated
 }
 

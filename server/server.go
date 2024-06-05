@@ -1,243 +1,93 @@
 package server
 
 import (
-	"context"
 	"errors"
-	"fmt"
-	"io"
-	"sync"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
-	"github.com/maria-mz/bash-battle-server/game"
+	"github.com/maria-mz/bash-battle-server/config"
+	"github.com/maria-mz/bash-battle-server/game/blueprint"
+	"github.com/maria-mz/bash-battle-server/game/fsm"
 	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/maria-mz/bash-battle-server/utils"
-	"google.golang.org/grpc/metadata"
 )
 
-// Server is the API for the BashBattle service.
-// Implements the gRPC `BashBattleServer` interface.
 type Server struct {
-	proto.UnimplementedBashBattleServer
+	config config.Config
 
 	// Registry of clients connected to the server. Identified by token.
-	clients *Registry[string, ClientRecord]
+	clients *ClientRegistry
+	players *PlayerRegistry
 
-	// Game instance managing the current game state
-	game *game.Game
+	streamer   *Streamer
+	streamMsgs <-chan StreamMsg
 
-	// TODO: think about this mutex
-	mutex sync.Mutex
+	blueprint blueprint.Blueprint
+
+	game       *fsm.FSM
+	fsmUpdates <-chan fsm.FSMState
 }
 
-func NewServer(clients *Registry[string, ClientRecord], config *proto.GameConfig) *Server {
-	// TODO: make game plan random
-	plan := game.BuildTempGamePlan(int(config.Rounds))
+func NewServer(config config.Config) *Server {
+	updates := make(chan fsm.FSMState)
+	streamMsgs := make(chan StreamMsg)
 
-	s := &Server{
-		clients: clients,
-		game:    game.NewGame(config, plan, func() {}),
+	return &Server{
+		config:     config,
+		clients:    NewClientRegistry(),
+		players:    NewPlayerRegistry(),
+		streamer:   NewStreamer(streamMsgs),
+		streamMsgs: streamMsgs,
+		game:       fsm.NewFSM(config.GameConfig, updates),
+		blueprint:  blueprint.BuildBlueprint(config.GameConfig),
+		fsmUpdates: updates,
 	}
-
-	return s
 }
 
-func (s *Server) isNameTaken(name string) bool {
-	for _, record := range s.clients.Records {
-		if record.Username == name {
-			return true
-		}
-	}
+func (s *Server) Login(req *proto.LoginRequest) (*proto.LoginResponse, error) {
+	log.Logger.Info("Received new login request", "username", req.Username)
 
-	return false
-}
+	token := utils.GenerateToken()
 
-func (s *Server) authenticateClient(ctx context.Context) (*ClientRecord, error) {
-	headers, _ := metadata.FromIncomingContext(ctx)
-	auth := headers["authorization"]
-
-	if len(auth) == 0 {
-		return nil, errors.New("token not found")
-	}
-
-	token := auth[0]
-
-	client, ok := s.clients.GetRecord(token)
-
-	if !ok {
-		return nil, errors.New("token not recognized")
-	}
-
-	return client, nil
-}
-
-func (s *Server) Login(ctx context.Context, request *proto.LoginRequest) (*proto.LoginResponse, error) {
-	log.Logger.Info("New login request", "username", request.Username)
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	err := s.validateLogin(request)
-
-	if err != nil {
-		log.Logger.Warn("Login failed", "reason", err)
+	if err := s.game.AddPlayer(req.Username); err != nil {
+		log.Logger.Warn("Login failed", "err", err)
 		return &proto.LoginResponse{}, err
 	}
 
-	response := s.loginClient(request)
+	s.clients.AddClient(token, req.Username)
+	s.players.AddPlayer(req.Username)
 
-	return response, nil
-}
-
-func (s *Server) validateLogin(request *proto.LoginRequest) error {
-	if s.isNameTaken(request.Username) {
-		return ErrNameTaken{request.Username}
-	}
-
-	if s.game.State != proto.GameState_Lobby {
-		return ErrGameStarted{}
-	}
-
-	if s.clients.Size() == int(s.game.Config.MaxPlayers) {
-		return ErrGameFull{}
-	}
-
-	return nil
-}
-
-func (s *Server) loginClient(request *proto.LoginRequest) *proto.LoginResponse {
-	token := utils.GenerateToken()
-
-	client := NewClientRecord(token, request.Username)
-	s.clients.AddRecord(*client)
-
-	response := &proto.LoginResponse{
-		Token:      token,
-		Players:    s.getPlayers(),
-		GameConfig: s.game.Config,
-	}
+	s.broadcastPlayerLogin(req.Username)
 
 	log.Logger.Info(
 		"Successfully logged in client",
-		"username", request.Username,
+		"username", req.Username,
 		"token", token,
 	)
 
-	s.broadcastPlayerLogin(client)
-
-	return response
+	return &proto.LoginResponse{Token: token}, nil
 }
 
-func (s *Server) getPlayers() []*proto.Player {
-	players := make([]*proto.Player, 0, s.clients.Size())
+func (s *Server) Stream(token string, stream proto.BashBattle_StreamServer) error {
+	_, ok := s.clients.GetClient(token)
 
-	for _, client := range s.clients.Records {
-		player := &proto.Player{
-			Username: client.Username,
-			Stats:    client.GameStats,
-		}
-		players = append(players, player)
+	if !ok {
+		return errors.New("client not recognized")
 	}
 
-	log.Logger.Debug(fmt.Sprintf("Players = %#v", players))
-
-	return players
-}
-
-func (s *Server) Stream(stream proto.BashBattle_StreamServer) error {
-	log.Logger.Info("New call to start stream")
-
-	client, err := s.authenticateClient(stream.Context())
-
-	if err != nil {
-		log.Logger.Warn("Failed to start stream", "err", err)
-		return err
-	}
-
-	if client.Stream != nil {
-		log.Logger.Warn("Stream is already running")
+	if s.streamer.IsStreamActive(token) {
 		return errors.New("stream is already running")
 	}
 
-	client.Stream = stream
+	s.streamer.UnRegisterStream(token) // Make sure old stream is gone
+	s.streamer.RegisterStream(token, stream)
 
-	go s.recvStream(client)
-	err = s.handleEndOfStream(client)
+	err := s.streamer.StartStreaming(token)
+
 	return err
 }
 
-func (s *Server) recvStream(client *ClientRecord) {
-	log.Logger.Info("Starting stream receive loop", "client", client.Username)
-
-	for {
-		_, err := client.Stream.Recv()
-
-		if err == io.EOF { // happens when client calls CloseSend()
-			client.EndStream <- EndStreamMsg{info: "EOF"}
-			return
-		}
-
-		if err != nil {
-			client.EndStream <- EndStreamMsg{err: err}
-			return
-		}
-	}
-}
-
-func (s *Server) handleEndOfStream(client *ClientRecord) error {
-	msg := <-client.EndStream // blocking
-
-	if msg.err != nil {
-		log.Logger.Warn(
-			"Stream ended due to error", "client", client.Username, "err", msg.err,
-		)
-	} else {
-		log.Logger.Info(
-			"Stream ended gracefully", "client", client.Username, "info", msg.info,
-		)
-	}
-
-	client.Stream = nil
-
-	return msg.err
-}
-
-func (s *Server) broadcast(event *proto.Event) {
-	log.Logger.Info("BROADCAST [start]", "event", event)
-
-	for _, client := range s.clients.Records {
-		s.sendEvent(event, client)
-	}
-
-	log.Logger.Info("BROADCAST [end]", "event", event)
-}
-
-func (s *Server) sendEvent(event *proto.Event, client *ClientRecord) {
-	if client.Stream == nil {
-		log.Logger.Info(
-			"Skip sending event to client (no stream)", "client", client.Username,
-		)
-		return
-	}
-
-	err := client.Stream.Send(event)
-
-	if err != nil {
-		log.Logger.Warn(
-			"Failed to send event to client", "client", client.Username,
-		)
-		client.EndStream <- EndStreamMsg{err: err}
-	} else {
-		log.Logger.Info(
-			"Successfully sent event to client", "client", client.Username,
-		)
-	}
-}
-
-func (s *Server) broadcastPlayerLogin(client *ClientRecord) {
-	player := &proto.Player{
-		Username: client.Username,
-		Stats:    client.GameStats,
-	}
+func (s *Server) broadcastPlayerLogin(username string) {
+	player, _ := s.players.GetPlayer(username)
 
 	event := &proto.Event{
 		Event: &proto.Event_PlayerLogin{
@@ -245,5 +95,5 @@ func (s *Server) broadcastPlayerLogin(client *ClientRecord) {
 		},
 	}
 
-	s.broadcast(event)
+	s.streamer.Broadcast(event, "Player Login")
 }

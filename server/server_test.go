@@ -1,26 +1,21 @@
 package server
 
 import (
-	"context"
 	"testing"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
+	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc/metadata"
 )
 
-const (
-	testToken    = "test-token"
-	testUsername = "test-player-name"
-)
-
-var testConfig = &proto.GameConfig{
-	MaxPlayers:   4,
-	Rounds:       10,
-	RoundSeconds: 300,
-	Difficulty:   proto.Difficulty_VariedDiff,
-	FileSize:     proto.FileSize_VariedSize,
+var testConfig = config.Config{
+	GameConfig: config.GameConfig{
+		MaxPlayers:        3,
+		Rounds:            5,
+		RoundDuration:     300,
+		CountdownDuration: 10,
+	},
 }
 
 func TestMain(m *testing.M) {
@@ -28,118 +23,68 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func getAuthContext(token string) context.Context {
-	header := metadata.New(map[string]string{"authorization": token})
-	ctx := metadata.NewIncomingContext(context.Background(), header)
-	return ctx
-}
-
-type authTest struct {
+type loginTest struct {
 	name       string
-	clients    []*ClientRecord
-	ctx        context.Context
-	token      string
+	requests   []*proto.LoginRequest
 	shouldFail bool
 }
 
-func (test authTest) run(t *testing.T) {
-	clients := NewRegistry[string, ClientRecord]()
-
-	for _, client := range test.clients {
-		clients.AddRecord(*client)
-	}
-
-	server := NewServer(clients, testConfig)
-
-	client, err := server.authenticateClient(test.ctx)
-
-	if test.shouldFail {
-		assert.NotNil(t, err)
-	} else {
-		assert.Nil(t, err)
-		assert.Equal(t, test.token, client.Token)
-	}
-}
-
-var authTests = []authTest{
-	{
-		name: "ok",
-		clients: []*ClientRecord{
-			{
-				Token:    testToken,
-				Username: testUsername,
-			},
-		},
-		ctx:        getAuthContext(testToken),
-		token:      testToken,
-		shouldFail: false,
-	},
-	{
-		name:       "no token in header",
-		clients:    []*ClientRecord{},
-		ctx:        context.Background(),
-		shouldFail: true,
-	},
-	{
-		name:       "unknown token",
-		clients:    []*ClientRecord{},
-		ctx:        getAuthContext(testToken),
-		shouldFail: true,
-	},
-}
-
-func TestAuth(t *testing.T) {
-	for _, st := range authTests {
-		t.Run(st.name, func(t *testing.T) {
-			st.run(t)
-		})
-	}
-}
-
-type loginTest struct {
-	name        string
-	clients     []*ClientRecord
-	request     *proto.LoginRequest
-	expectedErr error
-	shouldFail  bool
-}
-
 func (test loginTest) run(t *testing.T) {
-	clients := NewRegistry[string, ClientRecord]()
+	server := NewServer(testConfig)
 
-	for _, client := range test.clients {
-		clients.AddRecord(*client)
+	for i := 0; i < len(test.requests)-1; i++ {
+		server.Login(test.requests[i])
 	}
 
-	server := NewServer(clients, testConfig)
+	requestToTest := test.requests[len(test.requests)-1]
 
-	resp, err := server.Login(context.Background(), test.request)
-
-	assert.Equal(t, test.expectedErr, err)
+	resp, err := server.Login(requestToTest)
 
 	if test.shouldFail {
 		assert.Equal(t, resp.Token, "")
-		assert.False(t, clients.HasRecord(resp.Token))
+		assert.NotNil(t, err)
 	} else {
 		assert.NotEqual(t, resp.Token, "")
-		assert.True(t, clients.HasRecord(resp.Token))
+		assert.Nil(t, err)
+		assert.True(t, server.clients.HasClient(resp.Token))
+		assert.True(t, server.players.HasPlayer(requestToTest.Username))
 	}
 }
 
 var loginTests = []loginTest{
 	{
-		name:        "first client",
-		clients:     []*ClientRecord{},
-		request:     &proto.LoginRequest{Username: testUsername},
-		expectedErr: nil,
-		shouldFail:  false,
+		name: "first login",
+		requests: []*proto.LoginRequest{
+			{Username: "player-1"},
+		},
+		shouldFail: false,
 	},
 	{
-		name:        "name taken",
-		clients:     []*ClientRecord{NewClientRecord(testToken, testUsername)},
-		request:     &proto.LoginRequest{Username: testUsername},
-		expectedErr: ErrNameTaken{testUsername},
-		shouldFail:  true,
+		name: "all players login",
+		requests: []*proto.LoginRequest{
+			{Username: "player-1"},
+			{Username: "player-2"},
+			{Username: "player-3"},
+		},
+		shouldFail: false,
+	},
+	{
+		name: "name taken",
+		requests: []*proto.LoginRequest{
+			{Username: "player-1"},
+			{Username: "player-1"},
+		},
+		shouldFail: true,
+	},
+	{
+		name: "too many players",
+		requests: []*proto.LoginRequest{
+			{Username: "player-1"},
+			{Username: "player-2"},
+			{Username: "player-3"},
+			{Username: "player-4"},
+		},
+		shouldFail: true,
 	},
 }
 
@@ -150,3 +95,5 @@ func TestLogin(t *testing.T) {
 		})
 	}
 }
+
+// TODO: Add stream tests

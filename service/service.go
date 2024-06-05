@@ -7,6 +7,7 @@ import (
 
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
+	"github.com/maria-mz/bash-battle-server/router"
 	"github.com/maria-mz/bash-battle-server/server"
 	"google.golang.org/grpc"
 )
@@ -14,7 +15,6 @@ import (
 type Service struct {
 	config          config.Config
 	listener        net.Listener
-	server          *server.Server
 	serverRegistrar *grpc.Server
 }
 
@@ -22,11 +22,12 @@ func NewService(conf config.Config) *Service {
 	s := &Service{}
 	s.config = conf
 
-	clients := server.NewRegistry[string, server.ClientRecord]()
-	s.server = server.NewServer(clients, s.config.GameConfig)
+	server := server.NewServer(s.config)
+	router := router.NewServerRouter(server)
+
 	s.serverRegistrar = grpc.NewServer()
 
-	proto.RegisterBashBattleServer(s.serverRegistrar, s.server)
+	proto.RegisterBashBattleServer(s.serverRegistrar, router)
 
 	return s
 }

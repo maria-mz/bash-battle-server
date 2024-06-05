@@ -9,8 +9,6 @@ import (
 	"github.com/maria-mz/bash-battle-server/utils"
 )
 
-const CountdownDuration = 2 * time.Second
-
 // GameFSM manages the state and synchronization logic for a Bash Battle game.
 //
 // The FSM responds to player actions and time-based events to transition
@@ -169,7 +167,7 @@ func (fsm *GameFSM) runNextRound() {
 }
 
 func (fsm *GameFSM) countdown() bool {
-	fsm.timer = time.NewTimer(CountdownDuration)
+	fsm.timer = time.NewTimer(fsm.config.CountdownDuration)
 
 	log.Logger.Info(fmt.Sprintf("Countdown to Round %d started", fsm.round))
 

@@ -11,15 +11,17 @@ import (
 )
 
 var testConfigMultiPlayer = FSMConfig{
-	MaxPlayers:    3,
-	Rounds:        2,
-	RoundDuration: 3 * time.Second,
+	MaxPlayers:        3,
+	Rounds:            2,
+	RoundDuration:     3 * time.Second,
+	CountdownDuration: 2 * time.Second,
 }
 
 var testConfigSinglePlayer = FSMConfig{
-	MaxPlayers:    1,
-	Rounds:        2,
-	RoundDuration: 3 * time.Second,
+	MaxPlayers:        1,
+	Rounds:            2,
+	RoundDuration:     3 * time.Second,
+	CountdownDuration: 2 * time.Second,
 }
 
 func TestMain(m *testing.M) {
@@ -101,7 +103,7 @@ func TestCountingDownToWaitingForJoins(t *testing.T) {
 
 	assert.Equal(t, CountingDown, <-updates)
 
-	time.Sleep(CountdownDuration / 2)
+	time.Sleep(time.Second)
 
 	fsm.PlayerLeft("player-1")
 

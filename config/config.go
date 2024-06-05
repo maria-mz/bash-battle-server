@@ -3,14 +3,21 @@ package config
 import (
 	"encoding/json"
 	"os"
-
-	"github.com/maria-mz/bash-battle-proto/proto"
 )
 
+type GameConfig struct {
+	MaxPlayers        int
+	Rounds            int
+	RoundDuration     int
+	CountdownDuration int
+	Difficulty        int
+	FileSize          int
+}
+
 type Config struct {
-	Host       string            `json:"host"`
-	Port       uint16            `json:"port"`
-	GameConfig *proto.GameConfig `json:"gameConfig"`
+	Host       string     `json:"host"`
+	Port       uint16     `json:"port"`
+	GameConfig GameConfig `json:"gameConfig"`
 }
 
 func LoadConfig() (Config, error) {

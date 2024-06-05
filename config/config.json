@@ -4,7 +4,8 @@
   "gameConfig": {
     "maxPlayers": 4,
     "rounds": 10,
-    "roundSeconds": 300,
+    "roundDuration": 300,
+    "countdownDuration": 10,
     "difficulty": 0,
     "fileSize": 0
   }

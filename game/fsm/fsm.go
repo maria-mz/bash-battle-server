@@ -1,15 +1,17 @@
 package fsm
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/maria-mz/bash-battle-server/utils"
 )
 
-// GameFSM manages the state and synchronization logic for a Bash Battle game.
+// FSM manages the state and synchronization logic for a Bash Battle game.
 //
 // The FSM responds to player actions and time-based events to transition
 // between states. See docs/fsm-diagram.png for a diagram showing all the
@@ -21,8 +23,8 @@ import (
 //   - PlayerConfirmed: A player has confirmed they are ready for the next round.
 //
 // State changes are communicated through the provided FSMState channel.
-type GameFSM struct {
-	config FSMConfig
+type FSM struct {
+	config config.GameConfig
 
 	state FSMState
 
@@ -39,8 +41,8 @@ type GameFSM struct {
 	mutex sync.Mutex
 }
 
-func NewGameFSM(config FSMConfig, updates chan<- FSMState) *GameFSM {
-	return &GameFSM{
+func NewFSM(config config.GameConfig, updates chan<- FSMState) *FSM {
+	return &FSM{
 		config:     config,
 		cancelTime: make(chan bool),
 		players:    utils.NewSet[string](),
@@ -49,20 +51,20 @@ func NewGameFSM(config FSMConfig, updates chan<- FSMState) *GameFSM {
 	}
 }
 
-func (fsm *GameFSM) PlayerJoined(name string) {
+func (fsm *FSM) AddPlayer(name string) error {
 	fsm.mutex.Lock()
 	defer fsm.mutex.Unlock()
 
 	if fsm.state != WaitingForJoins {
-		return
+		return errors.New("game is not accepting joins")
 	}
 
 	if fsm.isGameFull() {
-		return
+		return errors.New("game is full")
 	}
 
 	if fsm.players.Contains(name) {
-		return
+		return fmt.Errorf("already a player with name %s", name)
 	}
 
 	fsm.players.Add(name)
@@ -77,9 +79,11 @@ func (fsm *GameFSM) PlayerJoined(name string) {
 		log.Logger.Info("Game is full, starting game!")
 		go fsm.runNextRound()
 	}
+
+	return nil
 }
 
-func (fsm *GameFSM) PlayerLeft(name string) {
+func (fsm *FSM) RemovePlayer(name string) {
 	fsm.mutex.Lock()
 	defer fsm.mutex.Unlock()
 
@@ -123,7 +127,8 @@ func (fsm *GameFSM) PlayerLeft(name string) {
 	}
 }
 
-func (fsm *GameFSM) PlayerConfirmed(name string) {
+// TODO: return error
+func (fsm *FSM) PlayerConfirmed(name string) {
 	fsm.mutex.Lock()
 	defer fsm.mutex.Unlock()
 
@@ -140,7 +145,7 @@ func (fsm *GameFSM) PlayerConfirmed(name string) {
 	fsm.checkConfirms()
 }
 
-func (fsm *GameFSM) checkConfirms() {
+func (fsm *FSM) checkConfirms() {
 	if fsm.confirms.Size() == fsm.players.Size() {
 		log.Logger.Info("Every player has confirmed, starting next round")
 		fsm.resetConfirms()
@@ -148,7 +153,7 @@ func (fsm *GameFSM) checkConfirms() {
 	}
 }
 
-func (fsm *GameFSM) runNextRound() {
+func (fsm *FSM) runNextRound() {
 	fsm.round++
 
 	fsm.updateState(CountingDown)
@@ -166,8 +171,8 @@ func (fsm *GameFSM) runNextRound() {
 	}
 }
 
-func (fsm *GameFSM) countdown() bool {
-	fsm.timer = time.NewTimer(fsm.config.CountdownDuration)
+func (fsm *FSM) countdown() bool {
+	fsm.timer = time.NewTimer(fsm.getCountdownDuration())
 
 	log.Logger.Info(fmt.Sprintf("Countdown to Round %d started", fsm.round))
 
@@ -183,8 +188,8 @@ func (fsm *GameFSM) countdown() bool {
 	}
 }
 
-func (fsm *GameFSM) playRound() bool {
-	fsm.timer = time.NewTimer(fsm.config.RoundDuration)
+func (fsm *FSM) playRound() bool {
+	fsm.timer = time.NewTimer(fsm.getRoundDuration())
 
 	log.Logger.Info(fmt.Sprintf("Round %d started", fsm.round))
 
@@ -200,7 +205,7 @@ func (fsm *GameFSM) playRound() bool {
 	}
 }
 
-func (fsm *GameFSM) updateState(state FSMState) {
+func (fsm *FSM) updateState(state FSMState) {
 	log.Logger.Info(
 		fmt.Sprintf(
 			"FSM changes state: %s -> %s",
@@ -213,36 +218,44 @@ func (fsm *GameFSM) updateState(state FSMState) {
 	fsm.updates <- state
 }
 
-func (fsm *GameFSM) endGame(withState FSMState) {
+func (fsm *FSM) endGame(withState FSMState) {
 	fsm.updateState(withState)
 	close(fsm.cancelTime)
 	close(fsm.updates)
 }
 
-func (fsm *GameFSM) isCountingDownToFirstRound() bool {
+func (fsm *FSM) isCountingDownToFirstRound() bool {
 	return fsm.state == CountingDown && fsm.round == 1
 }
 
-func (fsm *GameFSM) isGameFull() bool {
+func (fsm *FSM) isGameFull() bool {
 	return fsm.players.Size() == fsm.config.MaxPlayers
 }
 
-func (fsm *GameFSM) isGameEmpty() bool {
+func (fsm *FSM) isGameEmpty() bool {
 	return fsm.players.Size() == 0
 }
 
-func (fsm *GameFSM) isGameAbandoned() bool {
+func (fsm *FSM) isGameAbandoned() bool {
 	return fsm.isGameEmpty() && fsm.state != WaitingForJoins
 }
 
-func (fsm *GameFSM) hasGameEnded() bool {
+func (fsm *FSM) hasGameEnded() bool {
 	return fsm.state == Done || fsm.state == Terminated
 }
 
-func (fsm *GameFSM) isLastRound() bool {
+func (fsm *FSM) isLastRound() bool {
 	return fsm.round == fsm.config.Rounds
 }
 
-func (fsm *GameFSM) resetConfirms() {
+func (fsm *FSM) resetConfirms() {
 	fsm.confirms = utils.NewSet[string]()
+}
+
+func (fsm *FSM) getRoundDuration() time.Duration {
+	return time.Duration(fsm.config.RoundDuration) * time.Second
+}
+
+func (fsm *FSM) getCountdownDuration() time.Duration {
+	return time.Duration(fsm.config.CountdownDuration) * time.Second
 }

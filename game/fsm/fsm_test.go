@@ -6,22 +6,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/stretchr/testify/assert"
 )
 
-var testConfigMultiPlayer = FSMConfig{
+var testConfigMultiPlayer = config.GameConfig{
 	MaxPlayers:        3,
 	Rounds:            2,
-	RoundDuration:     3 * time.Second,
-	CountdownDuration: 2 * time.Second,
+	RoundDuration:     3, // seconds
+	CountdownDuration: 2, // seconds
 }
 
-var testConfigSinglePlayer = FSMConfig{
+var testConfigSinglePlayer = config.GameConfig{
 	MaxPlayers:        1,
 	Rounds:            2,
-	RoundDuration:     3 * time.Second,
-	CountdownDuration: 2 * time.Second,
+	RoundDuration:     3, // seconds
+	CountdownDuration: 2, // seconds
 }
 
 func TestMain(m *testing.M) {
@@ -31,7 +32,7 @@ func TestMain(m *testing.M) {
 
 func TestNewGameFSM(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigMultiPlayer, updates)
+	fsm := NewFSM(testConfigMultiPlayer, updates)
 
 	assert.NotNil(t, fsm)
 	assert.Equal(t, WaitingForJoins, fsm.state)
@@ -42,15 +43,15 @@ func TestNewGameFSM(t *testing.T) {
 
 func TestPlayerJoined(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigMultiPlayer, updates)
+	fsm := NewFSM(testConfigMultiPlayer, updates)
 
-	fsm.PlayerJoined("player-1")
+	fsm.AddPlayer("player-1")
 
 	assert.Equal(t, 1, fsm.players.Size())
 	assert.Equal(t, WaitingForJoins, fsm.state)
 
-	fsm.PlayerJoined("player-2")
-	fsm.PlayerJoined("player-3")
+	fsm.AddPlayer("player-2")
+	fsm.AddPlayer("player-3")
 
 	assert.Equal(t, 3, fsm.players.Size())
 	assert.Equal(t, CountingDown, <-updates)
@@ -58,17 +59,17 @@ func TestPlayerJoined(t *testing.T) {
 
 func TestPlayerLeft(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigMultiPlayer, updates)
+	fsm := NewFSM(testConfigMultiPlayer, updates)
 
-	fsm.PlayerJoined("player-1")
-	fsm.PlayerJoined("player-2")
+	fsm.AddPlayer("player-1")
+	fsm.AddPlayer("player-2")
 
-	fsm.PlayerLeft("player-2")
+	fsm.RemovePlayer("player-2")
 
 	assert.Equal(t, 1, fsm.players.Size())
 	assert.Equal(t, WaitingForJoins, fsm.state)
 
-	fsm.PlayerLeft("player-1")
+	fsm.RemovePlayer("player-1")
 
 	assert.Equal(t, 0, fsm.players.Size())
 	assert.Equal(t, WaitingForJoins, fsm.state)
@@ -76,11 +77,11 @@ func TestPlayerLeft(t *testing.T) {
 
 func TestTypicalGameFlow(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigMultiPlayer, updates)
+	fsm := NewFSM(testConfigMultiPlayer, updates)
 
-	fsm.PlayerJoined("player-1")
-	fsm.PlayerJoined("player-2")
-	fsm.PlayerJoined("player-3")
+	fsm.AddPlayer("player-1")
+	fsm.AddPlayer("player-2")
+	fsm.AddPlayer("player-3")
 
 	assert.Equal(t, CountingDown, <-updates)
 	assert.Equal(t, PlayingRound, <-updates)
@@ -97,53 +98,53 @@ func TestTypicalGameFlow(t *testing.T) {
 
 func TestCountingDownToWaitingForJoins(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigSinglePlayer, updates)
+	fsm := NewFSM(testConfigSinglePlayer, updates)
 
-	fsm.PlayerJoined("player-1")
+	fsm.AddPlayer("player-1")
 
 	assert.Equal(t, CountingDown, <-updates)
 
 	time.Sleep(time.Second)
 
-	fsm.PlayerLeft("player-1")
+	fsm.RemovePlayer("player-1")
 
 	assert.Equal(t, WaitingForJoins, <-updates)
 }
 
 func TestGameAbandonedDuringPlayingRound(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigSinglePlayer, updates)
+	fsm := NewFSM(testConfigSinglePlayer, updates)
 
-	fsm.PlayerJoined("player-1")
+	fsm.AddPlayer("player-1")
 
 	assert.Equal(t, CountingDown, <-updates)
 	assert.Equal(t, PlayingRound, <-updates)
 
-	fsm.PlayerLeft("player-1")
+	fsm.RemovePlayer("player-1")
 
 	assert.Equal(t, Terminated, <-updates)
 }
 
 func TestGameAbandonedWhileWaitingForConfirms(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigSinglePlayer, updates)
+	fsm := NewFSM(testConfigSinglePlayer, updates)
 
-	fsm.PlayerJoined("player-1")
+	fsm.AddPlayer("player-1")
 
 	assert.Equal(t, CountingDown, <-updates)
 	assert.Equal(t, PlayingRound, <-updates)
 	assert.Equal(t, WaitingForConfirms, <-updates)
 
-	fsm.PlayerLeft("player-1")
+	fsm.RemovePlayer("player-1")
 
 	assert.Equal(t, Terminated, <-updates)
 }
 
 func TestGameAbandonedDuringCountdown(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigSinglePlayer, updates)
+	fsm := NewFSM(testConfigSinglePlayer, updates)
 
-	fsm.PlayerJoined("player-1")
+	fsm.AddPlayer("player-1")
 
 	assert.Equal(t, CountingDown, <-updates)
 	assert.Equal(t, PlayingRound, <-updates)
@@ -153,18 +154,18 @@ func TestGameAbandonedDuringCountdown(t *testing.T) {
 
 	assert.Equal(t, CountingDown, <-updates)
 
-	fsm.PlayerLeft("player-1")
+	fsm.RemovePlayer("player-1")
 
 	assert.Equal(t, Terminated, <-updates)
 }
 
 func TestConfirmsWithLeave(t *testing.T) {
 	updates := make(chan FSMState, 1)
-	fsm := NewGameFSM(testConfigMultiPlayer, updates)
+	fsm := NewFSM(testConfigMultiPlayer, updates)
 
-	fsm.PlayerJoined("player-1")
-	fsm.PlayerJoined("player-2")
-	fsm.PlayerJoined("player-3")
+	fsm.AddPlayer("player-1")
+	fsm.AddPlayer("player-2")
+	fsm.AddPlayer("player-3")
 
 	assert.Equal(t, CountingDown, <-updates)
 	assert.Equal(t, PlayingRound, <-updates)
@@ -176,14 +177,14 @@ func TestConfirmsWithLeave(t *testing.T) {
 	assert.Equal(t, 2, fsm.confirms.Size())
 
 	// This player contributed a confirm
-	fsm.PlayerLeft("player-1")
+	fsm.RemovePlayer("player-1")
 
 	// So, confirms should go down by 1
 	assert.Equal(t, 1, fsm.confirms.Size())
 
 	// This player has not confirmed
 	// Them leaving should allow next round to start
-	fsm.PlayerLeft("player-3")
+	fsm.RemovePlayer("player-3")
 
 	assert.Equal(t, 1, fsm.players.Size())
 

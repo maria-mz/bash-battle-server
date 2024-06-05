@@ -21,7 +21,7 @@ func NewStreamer(incMsgs chan<- IncomingMsg) *Streamer {
 }
 
 func (s *Streamer) StartStreaming(sid string, streamServer proto.BashBattle_StreamServer) error {
-	if !s.streams.HasRecord(sid) {
+	if s.streams.HasRecord(sid) {
 		return fmt.Errorf("stream with sid %s is already active", sid)
 	}
 

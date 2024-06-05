@@ -67,10 +67,33 @@ func (s *Server) Login(req *proto.LoginRequest) (*proto.LoginResponse, error) {
 	return &proto.LoginResponse{Token: token}, nil
 }
 
-func (s *Server) Stream(token string, stream proto.BashBattle_StreamServer) error {
-	_, ok := s.clients.GetClient(token)
+func (s *Server) GetGameConfig(token string) (*proto.GameConfig, error) {
+	if !s.clients.HasClient(token) {
+		return &proto.GameConfig{}, errors.New("token not recognized")
+	}
 
-	if !ok {
+	return &proto.GameConfig{
+		MaxPlayers:       int32(s.config.GameConfig.MaxPlayers),
+		Rounds:           int32(s.config.GameConfig.Rounds),
+		RoundSeconds:     int32(s.config.GameConfig.RoundDuration),
+		CountdownSeconds: int32(s.config.GameConfig.CountdownDuration),
+		Difficulty:       proto.Difficulty(s.config.GameConfig.Difficulty),
+		FileSize:         proto.FileSize(s.config.GameConfig.FileSize),
+	}, nil
+}
+
+func (s *Server) GetPlayers(token string) (*proto.Players, error) {
+	if !s.clients.HasClient(token) {
+		return &proto.Players{}, errors.New("token not recognized")
+	}
+
+	return &proto.Players{
+		Players: s.players.GetPlayers(),
+	}, nil
+}
+
+func (s *Server) Stream(token string, stream proto.BashBattle_StreamServer) error {
+	if !s.clients.HasClient(token) {
 		return errors.New("token not recognized")
 	}
 

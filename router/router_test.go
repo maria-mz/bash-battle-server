@@ -42,12 +42,13 @@ func (test authTest) run(t *testing.T) {
 	server := server.NewServer(testConfig)
 	router := NewServerRouter(server)
 
-	token := router.getClientToken(test.ctx)
+	token, ok := router.getToken(test.ctx)
 
 	if test.shouldFail {
-		assert.Equal(t, NoToken, token)
+		assert.False(t, ok)
 	} else {
 		assert.Equal(t, test.token, token)
+		assert.True(t, ok)
 	}
 }
 

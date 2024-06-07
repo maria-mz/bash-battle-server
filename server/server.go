@@ -5,8 +5,7 @@ import (
 
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
-	"github.com/maria-mz/bash-battle-server/game/blueprint"
-	"github.com/maria-mz/bash-battle-server/game/fsm"
+	"github.com/maria-mz/bash-battle-server/game"
 	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/maria-mz/bash-battle-server/utils"
 )
@@ -21,14 +20,10 @@ type Server struct {
 	streamer           *Streamer
 	incomingStreamMsgs <-chan IncomingMsg
 
-	blueprint blueprint.Blueprint
-
-	game       *fsm.FSM
-	fsmUpdates <-chan fsm.FSMState
+	game *game.Game
 }
 
 func NewServer(config config.Config) *Server {
-	updates := make(chan fsm.FSMState)
 	incomingStreamMsgs := make(chan IncomingMsg)
 
 	return &Server{
@@ -37,9 +32,7 @@ func NewServer(config config.Config) *Server {
 		players:            NewPlayerRegistry(),
 		streamer:           NewStreamer(incomingStreamMsgs),
 		incomingStreamMsgs: incomingStreamMsgs,
-		game:               fsm.NewFSM(config.GameConfig, updates),
-		blueprint:          blueprint.BuildBlueprint(config.GameConfig),
-		fsmUpdates:         updates,
+		game:               game.NewGame(config.GameConfig),
 	}
 }
 
@@ -48,7 +41,7 @@ func (s *Server) Login(req *proto.LoginRequest) (*proto.LoginResponse, error) {
 
 	token := utils.GenerateToken()
 
-	if err := s.game.AddPlayer(req.Username); err != nil {
+	if err := s.game.AddNewPlayer(req.Username); err != nil {
 		log.Logger.Warn("Login failed", "err", err)
 		return &proto.LoginResponse{}, err
 	}

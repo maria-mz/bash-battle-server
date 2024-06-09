@@ -1,4 +1,4 @@
-package game
+package runner
 
 import (
 	"errors"
@@ -6,43 +6,26 @@ import (
 	"sync"
 	"time"
 
+	"github.com/maria-mz/bash-battle-server/game/data"
 	"github.com/maria-mz/bash-battle-server/log"
 )
 
 var ErrNoRoundsLeft error = errors.New("there are no rounds left to play")
 
-type RunnerEvent int
-
-const (
-	// CountingDown - Runner started counting down to the next round.
-	CountingDown RunnerEvent = iota
-
-	// RoundStarted - Timer started for the current round.
-	RoundStarted
-
-	// RoundEnded - Timer expired for the current (but not last) round.
-	RoundEnded
-
-	// GameDone - Timer expired for the last round.
-	GameDone
-)
-
 // GameRunner runs the rounds of a Bash Battle game.
 type GameRunner struct {
-	Game  *Game
-	round int
-
-	ch chan<- RunnerEvent
-
-	mu sync.Mutex
+	GameData *data.GameData
+	round    int
+	ch       chan<- RunnerEvent
+	mu       sync.Mutex
 }
 
-func NewRunner(game *Game) (*GameRunner, <-chan RunnerEvent) {
+func NewGameRunner(game *data.GameData) (*GameRunner, <-chan RunnerEvent) {
 	ch := make(chan RunnerEvent)
 
 	runner := &GameRunner{
-		Game: game,
-		ch:   ch,
+		GameData: game,
+		ch:       ch,
 	}
 
 	return runner, ch
@@ -71,12 +54,12 @@ func (runner *GameRunner) run() {
 	runner.ch <- CountingDown
 
 	log.Logger.Info(fmt.Sprintf("Counting down to round %d", runner.round))
-	runner.wait(runner.Game.GetCountdownDuration())
+	runner.wait(runner.GameData.GetCountdownDuration())
 
 	runner.ch <- RoundStarted
 
 	log.Logger.Info(fmt.Sprintf("Started round %d", runner.round))
-	runner.wait(runner.Game.GetRoundDuration())
+	runner.wait(runner.GameData.GetRoundDuration())
 
 	if runner.isFinalRound() {
 		runner.ch <- GameDone
@@ -93,7 +76,7 @@ func (runner *GameRunner) run() {
 }
 
 func (runner *GameRunner) isFinalRound() bool {
-	return runner.round == runner.Game.Config.Rounds
+	return runner.round == runner.GameData.Config.Rounds
 }
 
 func (runner *GameRunner) wait(duration time.Duration) {

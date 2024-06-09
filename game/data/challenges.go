@@ -1,4 +1,4 @@
-package game
+package data
 
 import "github.com/maria-mz/bash-battle-server/config"
 

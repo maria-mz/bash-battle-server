@@ -68,7 +68,7 @@ func (mgr *GameManager) AddPlayer(playerID string, name string) error {
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()
 
-	if mgr.state.Status() == Joining {
+	if mgr.state.Status() != Joining {
 		return ErrGameStarted
 	}
 

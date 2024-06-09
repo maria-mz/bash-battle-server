@@ -7,6 +7,7 @@ import (
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/server"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // ServerRouter is the API for the BashBattle gRPC service.
@@ -35,12 +36,24 @@ func (s *ServerRouter) getToken(ctx context.Context) (string, bool) {
 	return token, true
 }
 
-func (s *ServerRouter) Login(ctx context.Context, req *proto.LoginRequest) (*proto.LoginResponse, error) {
-	res, err := s.server.Login(req)
+func (s *ServerRouter) Connect(ctx context.Context, in *proto.ConnectRequest) (*proto.ConnectResponse, error) {
+	res, err := s.server.Connect(in)
 	return res, err
 }
 
-func (s *ServerRouter) GetGameConfig(ctx context.Context, _ *proto.EmptyMsg) (*proto.GameConfig, error) {
+func (s *ServerRouter) JoinGame(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
+	token, ok := s.getToken(ctx)
+
+	if !ok {
+		return &emptypb.Empty{}, errors.New("token not found")
+	}
+
+	err := s.server.JoinGame(token)
+
+	return &emptypb.Empty{}, err
+}
+
+func (s *ServerRouter) GetGameConfig(ctx context.Context, _ *emptypb.Empty) (*proto.GameConfig, error) {
 	token, ok := s.getToken(ctx)
 
 	if !ok {
@@ -52,7 +65,7 @@ func (s *ServerRouter) GetGameConfig(ctx context.Context, _ *proto.EmptyMsg) (*p
 	return config, err
 }
 
-func (s *ServerRouter) GetPlayers(ctx context.Context, _ *proto.EmptyMsg) (*proto.Players, error) {
+func (s *ServerRouter) GetPlayers(ctx context.Context, _ *emptypb.Empty) (*proto.Players, error) {
 	token, ok := s.getToken(ctx)
 
 	if !ok {

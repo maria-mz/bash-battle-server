@@ -5,7 +5,7 @@ import (
 
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
-	"github.com/maria-mz/bash-battle-server/game"
+	"github.com/maria-mz/bash-battle-server/game/manager"
 	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/maria-mz/bash-battle-server/utils"
 )
@@ -13,51 +13,72 @@ import (
 type Server struct {
 	config config.Config
 
-	// Registry of clients connected to the server. Identified by token.
-	clients *ClientRegistry
-	players *PlayerRegistry
+	clients *Clients
 
 	streamer           *Streamer
 	incomingStreamMsgs <-chan IncomingMsg
 
-	game *game.Game
+	gameManager     *manager.GameManager
+	gameManagerCmds <-chan manager.GameManagerCmd
 }
 
 func NewServer(config config.Config) *Server {
 	incomingStreamMsgs := make(chan IncomingMsg)
 
+	gameManager, gameManagerCmds := manager.NewGameManager(config.GameConfig)
+
 	return &Server{
 		config:             config,
-		clients:            NewClientRegistry(),
-		players:            NewPlayerRegistry(),
+		clients:            NewClients(),
 		streamer:           NewStreamer(incomingStreamMsgs),
 		incomingStreamMsgs: incomingStreamMsgs,
-		game:               game.NewGame(config.GameConfig),
+		gameManager:        gameManager,
+		gameManagerCmds:    gameManagerCmds,
 	}
 }
 
-func (s *Server) Login(req *proto.LoginRequest) (*proto.LoginResponse, error) {
-	log.Logger.Info("Received new login request", "username", req.Username)
+func (s *Server) Connect(req *proto.ConnectRequest) (*proto.ConnectResponse, error) {
+	log.Logger.Info("New connection request", "username", req.Username)
 
 	token := utils.GenerateToken()
 
-	if err := s.game.AddNewPlayer(req.Username); err != nil {
-		log.Logger.Warn("Login failed", "err", err)
-		return &proto.LoginResponse{}, err
+	err := s.clients.AddClient(token, req.Username)
+
+	if err != nil {
+		log.Logger.Warn("Connect failed", "err", err)
+		return &proto.ConnectResponse{}, err
 	}
 
-	s.clients.AddClient(token, req.Username)
-	s.players.AddPlayer(req.Username)
-
-	s.broadcastPlayerLogin(req.Username)
-
 	log.Logger.Info(
-		"Successfully logged in client",
+		"Connected new client",
 		"username", req.Username,
 		"token", token,
 	)
 
-	return &proto.LoginResponse{Token: token}, nil
+	return &proto.ConnectResponse{Token: token}, nil
+}
+
+func (s *Server) JoinGame(token string) error {
+	client, ok := s.clients.GetClient(token)
+
+	if !ok {
+		return errors.New("token not recognized")
+	}
+
+	err := s.gameManager.AddPlayer(client.token, client.username)
+
+	if err != nil {
+		log.Logger.Warn(
+			"Failed to add player",
+			"username", client.username,
+			"err", err,
+		)
+		return err
+	}
+
+	log.Logger.Info("Added player", "username", client.username)
+
+	return nil
 }
 
 func (s *Server) GetGameConfig(token string) (*proto.GameConfig, error) {
@@ -75,13 +96,14 @@ func (s *Server) GetGameConfig(token string) (*proto.GameConfig, error) {
 	}, nil
 }
 
+// TODO: fix
 func (s *Server) GetPlayers(token string) (*proto.Players, error) {
 	if !s.clients.HasClient(token) {
 		return &proto.Players{}, errors.New("token not recognized")
 	}
 
 	return &proto.Players{
-		Players: s.players.GetPlayers(),
+		// Players: s.players.GetPlayers(),
 	}, nil
 }
 
@@ -95,14 +117,15 @@ func (s *Server) Stream(token string, stream proto.BashBattle_StreamServer) erro
 	return err
 }
 
-func (s *Server) broadcastPlayerLogin(username string) {
-	player, _ := s.players.GetPlayer(username)
+// TODO: fix
+// func (s *Server) broadcastPlayerLogin(username string) {
+// 	player, _ := s.players.GetPlayer(username)
 
-	event := &proto.Event{
-		Event: &proto.Event_PlayerLogin{
-			PlayerLogin: &proto.PlayerLogin{Player: player},
-		},
-	}
+// 	event := &proto.Event{
+// 		Event: &proto.Event_PlayerLogin{
+// 			PlayerLogin: &proto.PlayerLogin{Player: player},
+// 		},
+// 	}
 
-	s.streamer.Broadcast(event, "Player Login")
-}
+// 	s.streamer.Broadcast(event, "Player Login")
+// }

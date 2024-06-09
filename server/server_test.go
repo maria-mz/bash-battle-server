@@ -23,22 +23,22 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-type loginTest struct {
+type connectTest struct {
 	name       string
-	requests   []*proto.LoginRequest
+	requests   []*proto.ConnectRequest
 	shouldFail bool
 }
 
-func (test loginTest) run(t *testing.T) {
+func (test connectTest) run(t *testing.T) {
 	server := NewServer(testConfig)
 
 	for i := 0; i < len(test.requests)-1; i++ {
-		server.Login(test.requests[i])
+		server.Connect(test.requests[i])
 	}
 
 	requestToTest := test.requests[len(test.requests)-1]
 
-	resp, err := server.Login(requestToTest)
+	resp, err := server.Connect(requestToTest)
 
 	if test.shouldFail {
 		assert.Equal(t, resp.Token, "")
@@ -47,21 +47,20 @@ func (test loginTest) run(t *testing.T) {
 		assert.NotEqual(t, resp.Token, "")
 		assert.Nil(t, err)
 		assert.True(t, server.clients.HasClient(resp.Token))
-		assert.True(t, server.players.HasPlayer(requestToTest.Username))
 	}
 }
 
-var loginTests = []loginTest{
+var loginTests = []connectTest{
 	{
 		name: "first login",
-		requests: []*proto.LoginRequest{
+		requests: []*proto.ConnectRequest{
 			{Username: "player-1"},
 		},
 		shouldFail: false,
 	},
 	{
 		name: "all players login",
-		requests: []*proto.LoginRequest{
+		requests: []*proto.ConnectRequest{
 			{Username: "player-1"},
 			{Username: "player-2"},
 			{Username: "player-3"},
@@ -70,21 +69,21 @@ var loginTests = []loginTest{
 	},
 	{
 		name: "name taken",
-		requests: []*proto.LoginRequest{
+		requests: []*proto.ConnectRequest{
 			{Username: "player-1"},
 			{Username: "player-1"},
 		},
 		shouldFail: true,
 	},
 	{
-		name: "too many players",
-		requests: []*proto.LoginRequest{
+		name: "more than max players",
+		requests: []*proto.ConnectRequest{
 			{Username: "player-1"},
 			{Username: "player-2"},
 			{Username: "player-3"},
 			{Username: "player-4"},
 		},
-		shouldFail: true,
+		shouldFail: false,
 	},
 }
 

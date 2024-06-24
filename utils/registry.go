@@ -1,4 +1,4 @@
-package registry
+package utils
 
 type IdentifiableRecord[T any] interface{}
 

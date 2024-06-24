@@ -73,16 +73,29 @@ func (manager *gameManager) handleRunnerEvents() {
 	}
 }
 
-func (manager *gameManager) handleClientAckMsgs(client *client) {
-	for msg := range client.stream.ackMsgs {
-		switch msg.Ack.(type) {
-		case *pb.AckMsg_RoundLoaded:
-			manager.handleLoadAck(client)
-
-		case *pb.AckMsg_RoundSubmission:
-			manager.handleSubmissionAck(msg, client)
-		}
+func (manager *gameManager) AddClient(client *client) error {
+	if manager.state != Lobby {
+		return ErrJoinOnGameStarted
 	}
+
+	_, ok := manager.clients[client.username]
+	if ok {
+		return ErrUsernameTaken
+	}
+
+	manager.clients[client.username] = client
+
+	player := game.NewPlayer(client.username)
+
+	manager.gameData.AddPlayer(player)
+	manager.broadcastPlayerJoin(player)
+
+	if manager.gameData.IsGameFull() {
+		manager.state = Load
+		manager.requestClientsToLoadRound(1)
+	}
+
+	return nil
 }
 
 func (manager *gameManager) ListenToClientStream(client *client) error {
@@ -115,6 +128,18 @@ func (manager *gameManager) ListenToClientStream(client *client) error {
 	}
 }
 
+func (manager *gameManager) handleClientAckMsgs(client *client) {
+	for msg := range client.stream.ackMsgs {
+		switch msg.Ack.(type) {
+		case *pb.AckMsg_RoundLoaded:
+			manager.handleLoadAck(client)
+
+		case *pb.AckMsg_RoundSubmission:
+			manager.handleSubmissionAck(msg, client)
+		}
+	}
+}
+
 func (manager *gameManager) handleLoadAck(client *client) {
 	if manager.state != Load {
 		return
@@ -122,15 +147,6 @@ func (manager *gameManager) handleLoadAck(client *client) {
 
 	manager.clientAckBitmap.SetLoadAck(client.username, true)
 	manager.checkLoads()
-}
-
-func (manager *gameManager) checkLoads() {
-	allLoaded := manager.clientAckBitmap.CountAcks(AckLoad) == len(manager.clients)
-
-	if allLoaded {
-		manager.state = Play
-		manager.gameRunner.RunRound()
-	}
 }
 
 func (manager *gameManager) handleSubmissionAck(ack *pb.AckMsg, client *client) {
@@ -152,6 +168,15 @@ func (manager *gameManager) handleSubmissionAck(ack *pb.AckMsg, client *client) 
 	manager.checkSubmissions()
 }
 
+func (manager *gameManager) checkLoads() {
+	allLoaded := manager.clientAckBitmap.CountAcks(AckLoad) == len(manager.clients)
+
+	if allLoaded {
+		manager.state = Play
+		manager.gameRunner.RunRound()
+	}
+}
+
 func (manager *gameManager) checkSubmissions() {
 	allSubmitted := manager.clientAckBitmap.CountAcks(AckSubmission) == len(manager.clients)
 
@@ -168,31 +193,6 @@ func (manager *gameManager) checkSubmissions() {
 		manager.state = Load
 		manager.requestClientsToLoadRound(manager.gameRunner.GetCurrentRound() + 1)
 	}
-}
-
-func (manager *gameManager) AddClient(client *client) error {
-	if manager.state != Lobby {
-		return ErrJoinOnGameStarted
-	}
-
-	_, ok := manager.clients[client.username]
-	if ok {
-		return ErrUsernameTaken
-	}
-
-	manager.clients[client.username] = client
-
-	player := game.NewPlayer(client.username)
-
-	manager.gameData.AddPlayer(player)
-	manager.broadcastPlayerJoin(player)
-
-	if manager.gameData.IsGameFull() {
-		manager.state = Load
-		manager.requestClientsToLoadRound(1)
-	}
-
-	return nil
 }
 
 func (manager *gameManager) broadcastPlayerJoin(player *game.Player) {

@@ -4,20 +4,19 @@ import (
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/log"
-	"github.com/maria-mz/bash-battle-server/registry"
 	"github.com/maria-mz/bash-battle-server/utils"
 )
 
 type Server struct {
 	config      config.Config
-	clients     *registry.Registry[string, client]
+	clients     *utils.Registry[string, client]
 	gameManager *gameManager
 }
 
 func NewServer(config config.Config) *Server {
 	return &Server{
 		config:      config,
-		clients:     registry.NewRegistry[string, client](),
+		clients:     utils.NewRegistry[string, client](),
 		gameManager: NewGameManager(config.GameConfig),
 	}
 }

@@ -10,6 +10,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+var ErrTokenNotFound = errors.New("token is missing")
+
 // ServerRouter is the API for the BashBattle gRPC service.
 // Handles authorization, directs processing of calls to the internal server.
 type ServerRouter struct {
@@ -45,7 +47,7 @@ func (s *ServerRouter) JoinGame(ctx context.Context, _ *emptypb.Empty) (*emptypb
 	token, ok := s.getToken(ctx)
 
 	if !ok {
-		return &emptypb.Empty{}, errors.New("token not found")
+		return &emptypb.Empty{}, ErrTokenNotFound
 	}
 
 	err := s.server.JoinGame(token)
@@ -57,7 +59,7 @@ func (s *ServerRouter) GetGameConfig(ctx context.Context, _ *emptypb.Empty) (*pr
 	token, ok := s.getToken(ctx)
 
 	if !ok {
-		return &proto.GameConfig{}, errors.New("token not found")
+		return &proto.GameConfig{}, ErrTokenNotFound
 	}
 
 	config, err := s.server.GetGameConfig(token)
@@ -65,23 +67,11 @@ func (s *ServerRouter) GetGameConfig(ctx context.Context, _ *emptypb.Empty) (*pr
 	return config, err
 }
 
-func (s *ServerRouter) GetPlayers(ctx context.Context, _ *emptypb.Empty) (*proto.Players, error) {
-	token, ok := s.getToken(ctx)
-
-	if !ok {
-		return &proto.Players{}, errors.New("token not found")
-	}
-
-	players, err := s.server.GetPlayers(token)
-
-	return players, err
-}
-
 func (s *ServerRouter) Stream(stream proto.BashBattle_StreamServer) error {
 	token, ok := s.getToken(stream.Context())
 
 	if !ok {
-		return errors.New("token not found")
+		return ErrTokenNotFound
 	}
 
 	err := s.server.Stream(token, stream)

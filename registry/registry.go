@@ -52,15 +52,15 @@ func (reg *Registry[K, V]) Records() []*V {
 	return values
 }
 
-// List returns a slice of all the records in the registry satisfying the query.
-func (reg *Registry[K, V]) RecordsMatchingQuery(query func(*V) bool) []*V {
-	values := make([]*V, reg.Size())
+// RecordsMatchingQuery returns the count of records satisfying the query.
+func (reg *Registry[K, V]) RecordsMatchingQuery(query func(*V) bool) int {
+	count := 0
 
 	for _, v := range reg.records {
 		if query(v) {
-			values = append(values, v)
+			count++
 		}
 	}
 
-	return values
+	return count
 }

@@ -1,10 +1,9 @@
-package runner
+package game
 
 import (
 	"testing"
 
 	"github.com/maria-mz/bash-battle-server/config"
-	"github.com/maria-mz/bash-battle-server/game/data"
 	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +20,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewGameRunner(t *testing.T) {
-	data := data.NewGameData(testConfig)
+	data := NewGameData(testConfig)
 	runner, _ := NewGameRunner(data)
 
 	assert.NotNil(t, runner)
@@ -31,7 +30,7 @@ func TestNewGameRunner(t *testing.T) {
 }
 
 func TestRunRound(t *testing.T) {
-	data := data.NewGameData(testConfig)
+	data := NewGameData(testConfig)
 	runner, ch := NewGameRunner(data)
 
 	// first round - ok

@@ -4,60 +4,63 @@ import (
 	"io"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
-	"github.com/maria-mz/bash-battle-server/log"
 )
 
-type EndStreamMsg struct {
+type streamEndMsg struct {
 	info string
 	err  error
 }
 
-type IncomingMsg struct {
-	sid string
-	msg *proto.AwkMsg
+type stream struct {
+	streamSrv     proto.BashBattle_StreamServer
+	ackMsgs       chan *proto.AckMsg
+	endStreamMsgs chan streamEndMsg
+	done          bool
 }
 
-type Stream struct {
-	sid       string
-	streamSrv proto.BashBattle_StreamServer
-	endStream chan EndStreamMsg
-}
-
-func NewStream(sid string, streamServer proto.BashBattle_StreamServer) *Stream {
-	return &Stream{
-		sid:       sid,
-		streamSrv: streamServer,
-		endStream: make(chan EndStreamMsg),
+func NewStream(streamServer proto.BashBattle_StreamServer) *stream {
+	return &stream{
+		streamSrv:     streamServer,
+		ackMsgs:       make(chan *proto.AckMsg),
+		endStreamMsgs: make(chan streamEndMsg),
 	}
 }
 
-func (s *Stream) Receive(msgs chan<- IncomingMsg) {
+func (s *stream) Recv() {
+	if s.done {
+		return
+	}
+
 	for {
 		msg, err := s.streamSrv.Recv()
 
 		if err == io.EOF { // happens when client calls CloseSend()
-			s.endStream <- EndStreamMsg{info: "EOF"}
+			s.closeStream(streamEndMsg{info: "EOF"})
 			return
 		}
 
 		if err != nil {
-			s.endStream <- EndStreamMsg{err: err}
+			s.closeStream(streamEndMsg{err: err})
 			return
 		}
 
-		msgs <- IncomingMsg{sid: s.sid, msg: msg}
+		s.ackMsgs <- msg
 	}
 }
 
-func (s *Stream) Send(event *proto.Event) {
-	err := s.streamSrv.Send(event)
-
-	if err != nil {
-		log.Logger.Warn("Failed to send event to stream", "sid", s.sid)
-
-		s.endStream <- EndStreamMsg{err: err}
-
-	} else {
-		log.Logger.Info("Successfully sent event to stream", "sid", s.sid)
+func (s *stream) SendEvent(event *proto.Event) {
+	if s.done {
+		return
 	}
+
+	if err := s.streamSrv.Send(event); err != nil {
+		s.closeStream(streamEndMsg{err: err})
+	}
+}
+
+func (s *stream) closeStream(msg streamEndMsg) {
+	s.endStreamMsgs <- msg
+	close(s.endStreamMsgs)
+	close(s.ackMsgs)
+	s.done = true
 }

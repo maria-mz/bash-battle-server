@@ -1,131 +1,105 @@
 package server
 
 import (
-	"errors"
-
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
-	"github.com/maria-mz/bash-battle-server/game/manager"
 	"github.com/maria-mz/bash-battle-server/log"
+	"github.com/maria-mz/bash-battle-server/registry"
 	"github.com/maria-mz/bash-battle-server/utils"
 )
 
 type Server struct {
-	config config.Config
-
-	clients *Clients
-
-	streamer           *Streamer
-	incomingStreamMsgs <-chan IncomingMsg
-
-	gameManager     *manager.GameManager
-	gameManagerCmds <-chan manager.GameManagerCmd
+	config      config.Config
+	clients     *registry.Registry[string, client]
+	gameManager *gameManager
 }
 
 func NewServer(config config.Config) *Server {
-	incomingStreamMsgs := make(chan IncomingMsg)
-
-	gameManager, gameManagerCmds := manager.NewGameManager(config.GameConfig)
-
 	return &Server{
-		config:             config,
-		clients:            NewClients(),
-		streamer:           NewStreamer(incomingStreamMsgs),
-		incomingStreamMsgs: incomingStreamMsgs,
-		gameManager:        gameManager,
-		gameManagerCmds:    gameManagerCmds,
+		config:      config,
+		clients:     registry.NewRegistry[string, client](),
+		gameManager: NewGameManager(config.GameConfig),
 	}
 }
 
-func (s *Server) Connect(req *proto.ConnectRequest) (*proto.ConnectResponse, error) {
-	log.Logger.Info("New connection request", "username", req.Username)
+func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse, error) {
+	log.Logger.Info("New connect request", "request", request)
 
 	token := utils.GenerateToken()
 
-	err := s.clients.AddClient(token, req.Username)
-
-	if err != nil {
-		log.Logger.Warn("Connect failed", "err", err)
-		return &proto.ConnectResponse{}, err
+	nameQuery := func(client *client) bool {
+		return client.username == request.Username
 	}
 
-	log.Logger.Info(
-		"Connected new client",
-		"username", req.Username,
-		"token", token,
-	)
+	if s.clients.RecordsMatchingQuery(nameQuery) > 0 {
+		log.Logger.Warn("Connect failed", "err", ErrUsernameTaken)
+		return nil, ErrUsernameTaken
+	}
+
+	client := &client{
+		token:    token,
+		username: request.Username,
+		active:   true,
+	}
+
+	s.clients.WriteRecord(client.token, client)
+
+	log.Logger.Info("Connected new client", "client", client)
 
 	return &proto.ConnectResponse{Token: token}, nil
 }
 
 func (s *Server) JoinGame(token string) error {
-	client, ok := s.clients.GetClient(token)
+	log.Logger.Info("New join game request")
+
+	client, ok := s.clients.GetRecord(token)
 
 	if !ok {
-		return errors.New("token not recognized")
+		log.Logger.Info("Failed to join game", "err", ErrTokenNotRecognized)
+		return ErrTokenNotRecognized
 	}
 
-	err := s.gameManager.AddPlayer(client.token, client.username)
+	err := s.gameManager.AddClient(client)
 
 	if err != nil {
-		log.Logger.Warn(
-			"Failed to add player",
-			"username", client.username,
-			"err", err,
-		)
+		log.Logger.Warn("Failed to join game", "client", client, "err", err)
 		return err
 	}
 
-	log.Logger.Info("Added player", "username", client.username)
+	log.Logger.Info("Client joined game", "client", client)
 
 	return nil
 }
 
 func (s *Server) GetGameConfig(token string) (*proto.GameConfig, error) {
-	if !s.clients.HasClient(token) {
-		return &proto.GameConfig{}, errors.New("token not recognized")
+	if !s.clients.HasRecord(token) {
+		return nil, ErrTokenNotRecognized
 	}
 
 	return &proto.GameConfig{
-		MaxPlayers:       int32(s.config.GameConfig.MaxPlayers),
-		Rounds:           int32(s.config.GameConfig.Rounds),
-		RoundSeconds:     int32(s.config.GameConfig.RoundDuration),
-		CountdownSeconds: int32(s.config.GameConfig.CountdownDuration),
-		Difficulty:       proto.Difficulty(s.config.GameConfig.Difficulty),
-		FileSize:         proto.FileSize(s.config.GameConfig.FileSize),
+		MaxPlayers:   int32(s.config.GameConfig.MaxPlayers),
+		Rounds:       int32(s.config.GameConfig.Rounds),
+		RoundSeconds: int32(s.config.GameConfig.RoundDuration),
+		Difficulty:   proto.Difficulty(s.config.GameConfig.Difficulty),
+		FileSize:     proto.FileSize(s.config.GameConfig.FileSize),
 	}, nil
 }
 
-// TODO: fix
-func (s *Server) GetPlayers(token string) (*proto.Players, error) {
-	if !s.clients.HasClient(token) {
-		return &proto.Players{}, errors.New("token not recognized")
+func (s *Server) Stream(token string, streamSrv proto.BashBattle_StreamServer) error {
+	client, ok := s.clients.GetRecord(token)
+
+	if !ok {
+		return ErrTokenNotRecognized
 	}
 
-	return &proto.Players{
-		// Players: s.players.GetPlayers(),
-	}, nil
-}
-
-func (s *Server) Stream(token string, stream proto.BashBattle_StreamServer) error {
-	if !s.clients.HasClient(token) {
-		return errors.New("token not recognized")
+	if client.stream != nil {
+		return ErrStreamAlreadyActive
 	}
 
-	err := s.streamer.StartStreaming(token, stream)
+	stream := NewStream(streamSrv)
+	client.stream = stream
+
+	err := s.gameManager.ListenToClientStream(client) // Blocking
 
 	return err
 }
-
-// TODO: fix
-// func (s *Server) broadcastPlayerLogin(username string) {
-// 	player, _ := s.players.GetPlayer(username)
-
-// 	event := &proto.Event{
-// 		Event: &proto.Event_PlayerLogin{
-// 			PlayerLogin: &proto.PlayerLogin{Player: player},
-// 		},
-// 	}
-
-// 	s.streamer.Broadcast(event, "Player Login")
-// }

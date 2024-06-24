@@ -12,9 +12,9 @@ import (
 var testConfig = config.Config{
 	GameConfig: config.GameConfig{
 		MaxPlayers:        3,
-		Rounds:            5,
-		RoundDuration:     300,
-		CountdownDuration: 10,
+		Rounds:            2,
+		RoundDuration:     2,
+		CountdownDuration: 1,
 	},
 }
 
@@ -41,25 +41,26 @@ func (test connectTest) run(t *testing.T) {
 	resp, err := server.Connect(requestToTest)
 
 	if test.shouldFail {
-		assert.Equal(t, resp.Token, "")
+		assert.Nil(t, resp)
 		assert.NotNil(t, err)
 	} else {
+		assert.NotNil(t, resp)
 		assert.NotEqual(t, resp.Token, "")
 		assert.Nil(t, err)
-		assert.True(t, server.clients.HasClient(resp.Token))
+		assert.True(t, server.clients.HasRecord(resp.Token))
 	}
 }
 
-var loginTests = []connectTest{
+var connectTests = []connectTest{
 	{
-		name: "first login",
+		name: "first connect",
 		requests: []*proto.ConnectRequest{
 			{Username: "player-1"},
 		},
 		shouldFail: false,
 	},
 	{
-		name: "all players login",
+		name: "all players connect",
 		requests: []*proto.ConnectRequest{
 			{Username: "player-1"},
 			{Username: "player-2"},
@@ -87,12 +88,10 @@ var loginTests = []connectTest{
 	},
 }
 
-func TestLogin(t *testing.T) {
-	for _, st := range loginTests {
+func TestConnect(t *testing.T) {
+	for _, st := range connectTests {
 		t.Run(st.name, func(t *testing.T) {
 			st.run(t)
 		})
 	}
 }
-
-// TODO: Add stream tests

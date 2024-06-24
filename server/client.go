@@ -1,6 +1,8 @@
 package server
 
-type Client struct {
+type client struct {
 	token    string
 	username string
+	active   bool
+	stream   *stream
 }

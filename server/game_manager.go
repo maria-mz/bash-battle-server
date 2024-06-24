@@ -18,6 +18,7 @@ const (
 	Play
 	Submission
 	Done
+	Terminated
 )
 
 type gameManager struct {

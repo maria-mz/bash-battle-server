@@ -5,7 +5,7 @@ import (
 
 	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/log"
-	"github.com/maria-mz/bash-battle-server/server/client"
+	"github.com/maria-mz/bash-battle-server/server/network"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +36,7 @@ func TestNewGameManager(t *testing.T) {
 func TestAddClient_Normal(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &client.Client{Username: "player-1", Active: true}
+	c1 := &network.Client{Username: "player-1", Active: true}
 
 	err := manager.AddClient(c1)
 
@@ -48,9 +48,9 @@ func TestAddClient_Normal(t *testing.T) {
 func TestAddClient_GameBecomesFull(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &client.Client{Username: "player-1", Active: true}
-	c2 := &client.Client{Username: "player-2", Active: true}
-	c3 := &client.Client{Username: "player-3", Active: true}
+	c1 := &network.Client{Username: "player-1", Active: true}
+	c2 := &network.Client{Username: "player-2", Active: true}
+	c3 := &network.Client{Username: "player-3", Active: true}
 
 	manager.AddClient(c1)
 	manager.AddClient(c2)
@@ -62,10 +62,10 @@ func TestAddClient_GameBecomesFull(t *testing.T) {
 func TestAddClient_ErrJoinOnGameStarted(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &client.Client{Username: "player-1", Active: true}
-	c2 := &client.Client{Username: "player-2", Active: true}
-	c3 := &client.Client{Username: "player-3", Active: true}
-	c4 := &client.Client{Username: "player-4", Active: true}
+	c1 := &network.Client{Username: "player-1", Active: true}
+	c2 := &network.Client{Username: "player-2", Active: true}
+	c3 := &network.Client{Username: "player-3", Active: true}
+	c4 := &network.Client{Username: "player-4", Active: true}
 
 	manager.AddClient(c1)
 	manager.AddClient(c2)

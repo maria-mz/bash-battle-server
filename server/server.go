@@ -6,9 +6,8 @@ import (
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/log"
-	"github.com/maria-mz/bash-battle-server/server/client"
 	"github.com/maria-mz/bash-battle-server/server/game_manager"
-	"github.com/maria-mz/bash-battle-server/server/stream"
+	"github.com/maria-mz/bash-battle-server/server/network"
 	"github.com/maria-mz/bash-battle-server/utils"
 )
 
@@ -18,14 +17,14 @@ var ErrUsernameTaken = errors.New("a player with this name already exists")
 
 type Server struct {
 	config      config.Config
-	clients     *utils.Registry[string, client.Client]
+	clients     *utils.Registry[string, network.Client]
 	gameManager *game_manager.GameManager
 }
 
 func NewServer(config config.Config) *Server {
 	return &Server{
 		config:      config,
-		clients:     utils.NewRegistry[string, client.Client](),
+		clients:     utils.NewRegistry[string, network.Client](),
 		gameManager: game_manager.NewGameManager(config.GameConfig),
 	}
 }
@@ -35,7 +34,7 @@ func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse,
 
 	token := utils.GenerateToken()
 
-	nameQuery := func(client *client.Client) bool {
+	nameQuery := func(client *network.Client) bool {
 		return client.Username == request.Username
 	}
 
@@ -44,7 +43,7 @@ func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse,
 		return nil, ErrUsernameTaken
 	}
 
-	client := &client.Client{
+	client := &network.Client{
 		Token:    token,
 		Username: request.Username,
 		Active:   true,
@@ -104,7 +103,7 @@ func (s *Server) Stream(token string, streamSrv proto.BashBattle_StreamServer) e
 		return ErrStreamAlreadyActive
 	}
 
-	stream := stream.NewStream(streamSrv)
+	stream := network.NewStream(streamSrv)
 	client.Stream = stream
 
 	err := s.gameManager.ListenForClientMsgs(client.Username) // Blocking

@@ -7,7 +7,6 @@ import (
 	pb "github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/game"
-	"github.com/maria-mz/bash-battle-server/server/client"
 	"github.com/maria-mz/bash-battle-server/server/network"
 )
 
@@ -78,7 +77,7 @@ func (manager *GameManager) handleRunnerEvents() {
 	}
 }
 
-func (manager *GameManager) AddClient(client *client.Client) error {
+func (manager *GameManager) AddClient(client *network.Client) error {
 	if manager.state != Lobby {
 		return ErrJoinOnGameStarted
 	}

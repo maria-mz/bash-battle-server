@@ -1,4 +1,4 @@
-package event_builder
+package network
 
 import (
 	"testing"

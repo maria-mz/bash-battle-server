@@ -7,8 +7,6 @@ import (
 	pb "github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/game"
 	"github.com/maria-mz/bash-battle-server/log"
-	"github.com/maria-mz/bash-battle-server/server/client"
-	"github.com/maria-mz/bash-battle-server/server/event_builder"
 )
 
 var ErrUsernameTaken = errors.New("a player with this name already exists")
@@ -20,13 +18,13 @@ type ClientMsg struct {
 }
 
 type Network struct {
-	clients        map[string]*client.Client
+	clients        map[string]*Client
 	clientMsgs     chan<- ClientMsg
 	activityBitmap ActivityBitmap
 }
 
 func NewNetwork() (*Network, <-chan ClientMsg) {
-	clients := make(map[string]*client.Client)
+	clients := make(map[string]*Client)
 	bitmap := NewActivityBitmap()
 	ch := make(chan ClientMsg)
 
@@ -39,7 +37,7 @@ func NewNetwork() (*Network, <-chan ClientMsg) {
 	return net, ch
 }
 
-func (net *Network) AddClient(client *client.Client) error {
+func (net *Network) AddClient(client *Client) error {
 	if _, ok := net.clients[client.Username]; ok {
 		return ErrUsernameTaken
 	} else {
@@ -72,7 +70,7 @@ func (net *Network) ListenForClientMsgs(username string) error {
 	return msg.Err
 }
 
-func (net *Network) handleClientMsgs(client *client.Client) {
+func (net *Network) handleClientMsgs(client *Client) {
 	for msg := range client.Stream.AckMsgs {
 		client.Active = true
 
@@ -100,7 +98,7 @@ func (net *Network) BroadcastPlayerJoin(player *game.Player) {
 		"Broadcasting event PLAYER_JOIN", "player", player.InfoString(),
 	)
 
-	event := event_builder.BuildPlayerJoinedEvent(player)
+	event := BuildPlayerJoinedEvent(player)
 	net.BroadcastEvent(event)
 }
 
@@ -109,7 +107,7 @@ func (net *Network) BroadcastCountdown(round int, startsAt time.Time) {
 		"Broadcasting event COUNTING_DOWN", "round", round, "startsAt", startsAt.UTC(),
 	)
 
-	event := event_builder.BuildCountingDownEvent(round, startsAt)
+	event := BuildCountingDownEvent(round, startsAt)
 	net.BroadcastEvent(event)
 }
 
@@ -118,14 +116,14 @@ func (net *Network) BroadcastRoundStart(round int, endsAt time.Time) {
 		"Broadcasting event ROUND_STARTED", "round", round, "endsAt", endsAt.UTC(),
 	)
 
-	event := event_builder.BuildRoundStartedEvent(round, endsAt)
+	event := BuildRoundStartedEvent(round, endsAt)
 	net.BroadcastEvent(event)
 }
 
 func (net *Network) BroadcastGameOver() {
 	log.Logger.Info("Broadcasting event GAME_OVER")
 
-	event := event_builder.BuildGameOverEvent()
+	event := BuildGameOverEvent()
 	net.BroadcastEvent(event)
 }
 
@@ -134,14 +132,14 @@ func (net *Network) BroadcastLoadRoundCmd(round int, challenge game.Challenge) {
 		"Broadcasting command LOAD_ROUND", "round", round, "challenge", challenge.InfoString(),
 	)
 
-	cmd := event_builder.BuildLoadRoundEvent(round, challenge)
+	cmd := BuildLoadRoundEvent(round, challenge)
 	net.BroadcastEvent(cmd)
 }
 
 func (net *Network) BroadcastSubmitScoreCmd(round int) {
 	log.Logger.Info("Broadcasting command SUBMIT_ROUND_SCORE", "round", round)
 
-	cmd := event_builder.BuildSubmitRoundScoreEvent()
+	cmd := BuildSubmitRoundScoreEvent()
 	net.BroadcastEvent(cmd)
 }
 
@@ -151,7 +149,7 @@ func (net *Network) BroadcastEvent(event *pb.Event) {
 	}
 }
 
-func (net *Network) sendEventToClient(event *pb.Event, client *client.Client) {
+func (net *Network) sendEventToClient(event *pb.Event, client *Client) {
 	if client.Stream != nil {
 		log.Logger.Info(
 			"Sent event to client", "client", client.Username,

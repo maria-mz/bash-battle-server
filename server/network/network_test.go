@@ -6,8 +6,6 @@ import (
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/game"
 	"github.com/maria-mz/bash-battle-server/log"
-	"github.com/maria-mz/bash-battle-server/server/client"
-	"github.com/maria-mz/bash-battle-server/server/stream"
 	"github.com/maria-mz/bash-battle-server/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +27,7 @@ func TestNewNetwork(t *testing.T) {
 func TestAddClient_Ok(t *testing.T) {
 	network, _ := NewNetwork()
 
-	c1 := &client.Client{Username: "player-1"}
+	c1 := &Client{Username: "player-1"}
 
 	err := network.AddClient(c1)
 
@@ -40,8 +38,8 @@ func TestAddClient_Ok(t *testing.T) {
 func TestAddClient_ErrNameTaken(t *testing.T) {
 	network, _ := NewNetwork()
 
-	c1 := &client.Client{Username: "player-1"}
-	c2 := &client.Client{Username: "player-1"}
+	c1 := &Client{Username: "player-1"}
+	c2 := &Client{Username: "player-1"}
 
 	network.AddClient(c1)
 	err := network.AddClient(c2)
@@ -56,15 +54,15 @@ func TestBroadcast(t *testing.T) {
 	mss1 := utils.NewMockStreamServer()
 	mss2 := utils.NewMockStreamServer()
 
-	c1 := &client.Client{
+	c1 := &Client{
 		Username: "player-1",
-		Stream:   stream.NewStream(mss1),
+		Stream:   NewStream(mss1),
 		Active:   true,
 	}
-	c2 := &client.Client{Username: "player-2"} // No stream
-	c3 := &client.Client{
+	c2 := &Client{Username: "player-2"} // No stream
+	c3 := &Client{
 		Username: "player-3",
-		Stream:   stream.NewStream(mss2),
+		Stream:   NewStream(mss2),
 		Active:   true,
 	}
 
@@ -86,9 +84,9 @@ func TestClientAck(t *testing.T) {
 
 	mss := utils.NewMockStreamServer()
 
-	c := &client.Client{
+	c := &Client{
 		Username: "player-1",
-		Stream:   stream.NewStream(mss),
+		Stream:   NewStream(mss),
 		Active:   true,
 	}
 

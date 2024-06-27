@@ -75,3 +75,13 @@ func buildSubmitRoundScoreEvent() *pb.Event {
 
 	return event
 }
+
+func buildGameOverEvent() *pb.Event {
+	event := &pb.Event{
+		Event: &pb.Event_GameOver{
+			GameOver: &pb.GameOver{},
+		},
+	}
+
+	return event
+}

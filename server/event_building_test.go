@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"testing"
 	"time"
 
@@ -80,12 +79,21 @@ func TestBuildLoadRoundEvent(t *testing.T) {
 func TestBuildSubmitRoundScoreEvent(t *testing.T) {
 	event := buildSubmitRoundScoreEvent()
 
-	log.Print(event)
-
 	assert.NotNil(t, event)
 
 	// Since message inside is empty assert.NotNil() will evaluate to false
 	// Validate type by type assertion instead
 	_, ok := event.GetEvent().(*proto.Event_SubmitRoundScore)
+	assert.True(t, ok)
+}
+
+func TestBuildGameOverEvent(t *testing.T) {
+	event := buildGameOverEvent()
+
+	assert.NotNil(t, event)
+
+	// Since message inside is empty assert.NotNil() will evaluate to false
+	// Validate type by type assertion instead
+	_, ok := event.GetEvent().(*proto.Event_GameOver)
 	assert.True(t, ok)
 }

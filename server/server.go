@@ -1,23 +1,32 @@
 package server
 
 import (
+	"errors"
+
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/log"
+	"github.com/maria-mz/bash-battle-server/server/client"
+	"github.com/maria-mz/bash-battle-server/server/game_manager"
+	"github.com/maria-mz/bash-battle-server/server/stream"
 	"github.com/maria-mz/bash-battle-server/utils"
 )
 
+var ErrTokenNotRecognized = errors.New("token not recognized")
+var ErrStreamAlreadyActive = errors.New("stream is already active")
+var ErrUsernameTaken = errors.New("a player with this name already exists")
+
 type Server struct {
 	config      config.Config
-	clients     *utils.Registry[string, client]
-	gameManager *gameManager
+	clients     *utils.Registry[string, client.Client]
+	gameManager *game_manager.GameManager
 }
 
 func NewServer(config config.Config) *Server {
 	return &Server{
 		config:      config,
-		clients:     utils.NewRegistry[string, client](),
-		gameManager: NewGameManager(config.GameConfig),
+		clients:     utils.NewRegistry[string, client.Client](),
+		gameManager: game_manager.NewGameManager(config.GameConfig),
 	}
 }
 
@@ -26,8 +35,8 @@ func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse,
 
 	token := utils.GenerateToken()
 
-	nameQuery := func(client *client) bool {
-		return client.username == request.Username
+	nameQuery := func(client *client.Client) bool {
+		return client.Username == request.Username
 	}
 
 	if s.clients.RecordsMatchingQuery(nameQuery) > 0 {
@@ -35,13 +44,13 @@ func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse,
 		return nil, ErrUsernameTaken
 	}
 
-	client := &client{
-		token:    token,
-		username: request.Username,
-		active:   true,
+	client := &client.Client{
+		Token:    token,
+		Username: request.Username,
+		Active:   true,
 	}
 
-	s.clients.WriteRecord(client.token, client)
+	s.clients.WriteRecord(client.Token, client)
 
 	log.Logger.Info("Connected new client", "client", client)
 
@@ -91,14 +100,14 @@ func (s *Server) Stream(token string, streamSrv proto.BashBattle_StreamServer) e
 		return ErrTokenNotRecognized
 	}
 
-	if client.stream != nil {
+	if client.Stream != nil {
 		return ErrStreamAlreadyActive
 	}
 
-	stream := NewStream(streamSrv)
-	client.stream = stream
+	stream := stream.NewStream(streamSrv)
+	client.Stream = stream
 
-	err := s.gameManager.ListenForClientMsgs(client.username) // Blocking
+	err := s.gameManager.ListenForClientMsgs(client.Username) // Blocking
 
 	return err
 }

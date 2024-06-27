@@ -1,13 +1,21 @@
-package server
+package network
 
 import (
 	"testing"
 
 	"github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/game"
+	"github.com/maria-mz/bash-battle-server/log"
+	"github.com/maria-mz/bash-battle-server/server/client"
+	"github.com/maria-mz/bash-battle-server/server/stream"
 	"github.com/maria-mz/bash-battle-server/utils"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestMain(m *testing.M) {
+	log.InitLogger()
+	m.Run()
+}
 
 func TestNewNetwork(t *testing.T) {
 	network, clientMsgs := NewNetwork()
@@ -21,25 +29,25 @@ func TestNewNetwork(t *testing.T) {
 func TestAddClient_Ok(t *testing.T) {
 	network, _ := NewNetwork()
 
-	c1 := &client{username: "player-1"}
+	c1 := &client.Client{Username: "player-1"}
 
 	err := network.AddClient(c1)
 
 	assert.Nil(t, err)
-	assert.Equal(t, network.clients[c1.username], c1)
+	assert.Equal(t, network.clients[c1.Username], c1)
 }
 
 func TestAddClient_ErrNameTaken(t *testing.T) {
 	network, _ := NewNetwork()
 
-	c1 := &client{username: "player-1"}
-	c2 := &client{username: "player-1"}
+	c1 := &client.Client{Username: "player-1"}
+	c2 := &client.Client{Username: "player-1"}
 
 	network.AddClient(c1)
 	err := network.AddClient(c2)
 
 	assert.Equal(t, ErrUsernameTaken, err)
-	assert.Equal(t, network.clients[c1.username], c1) // Ensure ptr is perserved
+	assert.Equal(t, network.clients[c1.Username], c1) // Ensure ptr is perserved
 }
 
 func TestBroadcast(t *testing.T) {
@@ -48,16 +56,16 @@ func TestBroadcast(t *testing.T) {
 	mss1 := utils.NewMockStreamServer()
 	mss2 := utils.NewMockStreamServer()
 
-	c1 := &client{
-		username: "player-1",
-		stream:   NewStream(mss1),
-		active:   true,
+	c1 := &client.Client{
+		Username: "player-1",
+		Stream:   stream.NewStream(mss1),
+		Active:   true,
 	}
-	c2 := &client{username: "player-2"} // No stream
-	c3 := &client{
-		username: "player-3",
-		stream:   NewStream(mss2),
-		active:   true,
+	c2 := &client.Client{Username: "player-2"} // No stream
+	c3 := &client.Client{
+		Username: "player-3",
+		Stream:   stream.NewStream(mss2),
+		Active:   true,
 	}
 
 	network.AddClient(c1)
@@ -78,10 +86,10 @@ func TestClientAck(t *testing.T) {
 
 	mss := utils.NewMockStreamServer()
 
-	c := &client{
-		username: "player-1",
-		stream:   NewStream(mss),
-		active:   true,
+	c := &client.Client{
+		Username: "player-1",
+		Stream:   stream.NewStream(mss),
+		Active:   true,
 	}
 
 	go func() {
@@ -95,13 +103,13 @@ func TestClientAck(t *testing.T) {
 
 		clientMsg := <-clientMsgs
 
-		assert.Equal(t, c.username, clientMsg.Username)
+		assert.Equal(t, c.Username, clientMsg.Username)
 		assert.Equal(t, ackMsg, clientMsg.Msg)
-		assert.True(t, network.GetClientLoadStatus(c.username))
+		assert.True(t, network.GetClientLoadStatus(c.Username))
 
 		mss.Close() // Actually ends test goroutine
 	}()
 
 	network.AddClient(c)
-	network.ListenForClientMsgs(c.username) // Blocks until mss.Close() is called
+	network.ListenForClientMsgs(c.Username) // Blocks until mss.Close() is called
 }

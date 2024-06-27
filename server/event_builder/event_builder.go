@@ -1,4 +1,4 @@
-package server
+package event_builder
 
 import (
 	"time"
@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func buildPlayerJoinedEvent(player *game.Player) *pb.Event {
+func BuildPlayerJoinedEvent(player *game.Player) *pb.Event {
 	event := &pb.Event{
 		Event: &pb.Event_PlayerJoined{
 			PlayerJoined: &pb.PlayerJoined{Player: player.ToProto()},
@@ -18,7 +18,7 @@ func buildPlayerJoinedEvent(player *game.Player) *pb.Event {
 	return event
 }
 
-func buildPlayerLeftEvent(player *game.Player) *pb.Event {
+func BuildPlayerLeftEvent(player *game.Player) *pb.Event {
 	event := &pb.Event{
 		Event: &pb.Event_PlayerLeft{
 			PlayerLeft: &pb.PlayerLeft{Player: player.ToProto()},
@@ -28,7 +28,7 @@ func buildPlayerLeftEvent(player *game.Player) *pb.Event {
 	return event
 }
 
-func buildCountingDownEvent(round int, startsAt time.Time) *pb.Event {
+func BuildCountingDownEvent(round int, startsAt time.Time) *pb.Event {
 	event := &pb.Event{
 		Event: &pb.Event_CountingDown{
 			CountingDown: &pb.CountingDown{
@@ -41,7 +41,7 @@ func buildCountingDownEvent(round int, startsAt time.Time) *pb.Event {
 	return event
 }
 
-func buildRoundStartedEvent(round int, endsAt time.Time) *pb.Event {
+func BuildRoundStartedEvent(round int, endsAt time.Time) *pb.Event {
 	event := &pb.Event{
 		Event: &pb.Event_RoundStarted{
 			RoundStarted: &pb.RoundStarted{
@@ -54,7 +54,7 @@ func buildRoundStartedEvent(round int, endsAt time.Time) *pb.Event {
 	return event
 }
 
-func buildLoadRoundEvent(round int, challenge game.Challenge) *pb.Event {
+func BuildLoadRoundEvent(round int, challenge game.Challenge) *pb.Event {
 	event := &pb.Event{
 		Event: &pb.Event_LoadRound{
 			LoadRound: &pb.LoadRound{
@@ -68,7 +68,7 @@ func buildLoadRoundEvent(round int, challenge game.Challenge) *pb.Event {
 	return event
 }
 
-func buildSubmitRoundScoreEvent() *pb.Event {
+func BuildSubmitRoundScoreEvent() *pb.Event {
 	event := &pb.Event{
 		Event: &pb.Event_SubmitRoundScore{},
 	}
@@ -76,7 +76,7 @@ func buildSubmitRoundScoreEvent() *pb.Event {
 	return event
 }
 
-func buildGameOverEvent() *pb.Event {
+func BuildGameOverEvent() *pb.Event {
 	event := &pb.Event{
 		Event: &pb.Event_GameOver{
 			GameOver: &pb.GameOver{},

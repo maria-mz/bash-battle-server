@@ -1,10 +1,27 @@
-package server
+package game_manager
 
 import (
 	"testing"
 
+	"github.com/maria-mz/bash-battle-server/config"
+	"github.com/maria-mz/bash-battle-server/log"
+	"github.com/maria-mz/bash-battle-server/server/client"
 	"github.com/stretchr/testify/assert"
 )
+
+var testConfig = config.Config{
+	GameConfig: config.GameConfig{
+		MaxPlayers:        3,
+		Rounds:            2,
+		RoundDuration:     2,
+		CountdownDuration: 1,
+	},
+}
+
+func TestMain(m *testing.M) {
+	log.InitLogger()
+	m.Run()
+}
 
 func TestNewGameManager(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
@@ -19,7 +36,7 @@ func TestNewGameManager(t *testing.T) {
 func TestAddClient_Normal(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &client{username: "player-1", active: true}
+	c1 := &client.Client{Username: "player-1", Active: true}
 
 	err := manager.AddClient(c1)
 
@@ -31,9 +48,9 @@ func TestAddClient_Normal(t *testing.T) {
 func TestAddClient_GameBecomesFull(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &client{username: "player-1", active: true}
-	c2 := &client{username: "player-2", active: true}
-	c3 := &client{username: "player-3", active: true}
+	c1 := &client.Client{Username: "player-1", Active: true}
+	c2 := &client.Client{Username: "player-2", Active: true}
+	c3 := &client.Client{Username: "player-3", Active: true}
 
 	manager.AddClient(c1)
 	manager.AddClient(c2)
@@ -45,10 +62,10 @@ func TestAddClient_GameBecomesFull(t *testing.T) {
 func TestAddClient_ErrJoinOnGameStarted(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &client{username: "player-1", active: true}
-	c2 := &client{username: "player-2", active: true}
-	c3 := &client{username: "player-3", active: true}
-	c4 := &client{username: "player-4", active: true}
+	c1 := &client.Client{Username: "player-1", Active: true}
+	c2 := &client.Client{Username: "player-2", Active: true}
+	c3 := &client.Client{Username: "player-3", Active: true}
+	c4 := &client.Client{Username: "player-4", Active: true}
 
 	manager.AddClient(c1)
 	manager.AddClient(c2)
@@ -56,16 +73,4 @@ func TestAddClient_ErrJoinOnGameStarted(t *testing.T) {
 	err := manager.AddClient(c4)
 
 	assert.Equal(t, err, ErrJoinOnGameStarted)
-}
-
-func TestAddClient_ErrUsernameTaken(t *testing.T) {
-	manager := NewGameManager(testConfig.GameConfig)
-
-	c1 := &client{username: "player-1", active: true}
-	c2 := &client{username: "player-1", active: true}
-
-	manager.AddClient(c1)
-	err := manager.AddClient(c2)
-
-	assert.Equal(t, ErrUsernameTaken, err)
 }

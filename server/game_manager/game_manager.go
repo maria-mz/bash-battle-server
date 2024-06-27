@@ -1,12 +1,18 @@
-package server
+package game_manager
 
 import (
+	"errors"
 	"time"
 
 	pb "github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/game"
+	"github.com/maria-mz/bash-battle-server/server/client"
+	"github.com/maria-mz/bash-battle-server/server/network"
 )
+
+var ErrJoinOnGameStarted = errors.New("cannot join game: game already started")
+var ErrStreamOnGameOver = errors.New("cannot stream game: game is over")
 
 type state int
 
@@ -19,9 +25,9 @@ const (
 	Terminated
 )
 
-type gameManager struct {
-	network    *Network
-	clientMsgs <-chan ClientMsg
+type GameManager struct {
+	network    *network.Network
+	clientMsgs <-chan network.ClientMsg
 
 	gameData         *game.GameData
 	gameRunner       *game.GameRunner
@@ -30,12 +36,12 @@ type gameManager struct {
 	state state
 }
 
-func NewGameManager(config config.GameConfig) *gameManager {
-	network, clientMsgs := NewNetwork()
+func NewGameManager(config config.GameConfig) *GameManager {
+	network, clientMsgs := network.NewNetwork()
 	gameData := game.NewGameData(config)
 	gameRunner, gameRunnerEvents := game.NewGameRunner(gameData)
 
-	manager := &gameManager{
+	manager := &GameManager{
 		network:          network,
 		clientMsgs:       clientMsgs,
 		gameData:         gameData,
@@ -49,7 +55,7 @@ func NewGameManager(config config.GameConfig) *gameManager {
 	return manager
 }
 
-func (manager *gameManager) handleRunnerEvents() {
+func (manager *GameManager) handleRunnerEvents() {
 	for event := range manager.gameRunnerEvents {
 		round := manager.gameRunner.GetCurrentRound()
 
@@ -72,7 +78,7 @@ func (manager *gameManager) handleRunnerEvents() {
 	}
 }
 
-func (manager *gameManager) AddClient(client *client) error {
+func (manager *GameManager) AddClient(client *client.Client) error {
 	if manager.state != Lobby {
 		return ErrJoinOnGameStarted
 	}
@@ -81,7 +87,7 @@ func (manager *gameManager) AddClient(client *client) error {
 		return err
 	}
 
-	player := game.NewPlayer(client.username)
+	player := game.NewPlayer(client.Username)
 
 	manager.gameData.AddPlayer(player)
 	manager.network.BroadcastPlayerJoin(player)
@@ -94,12 +100,12 @@ func (manager *gameManager) AddClient(client *client) error {
 	return nil
 }
 
-func (manager *gameManager) ListenForClientMsgs(username string) error {
+func (manager *GameManager) ListenForClientMsgs(username string) error {
 	err := manager.network.ListenForClientMsgs(username) // Blocking
 	return err
 }
 
-func (manager *gameManager) handleClientMsgs() {
+func (manager *GameManager) handleClientMsgs() {
 	for msg := range manager.clientMsgs {
 		switch ack := msg.Msg.GetAck().(type) {
 
@@ -119,7 +125,7 @@ func (manager *gameManager) handleClientMsgs() {
 	}
 }
 
-func (manager *gameManager) makeSubmission(msg *pb.AckMsg_RoundSubmission, username string) {
+func (manager *GameManager) makeSubmission(msg *pb.AckMsg_RoundSubmission, username string) {
 	score := game.Score{
 		Round: manager.gameRunner.GetCurrentRound(),
 		Win:   msg.RoundSubmission.RoundStats.Won,
@@ -129,14 +135,14 @@ func (manager *gameManager) makeSubmission(msg *pb.AckMsg_RoundSubmission, usern
 	player.SetRoundScore(score)
 }
 
-func (manager *gameManager) checkLoads() {
+func (manager *GameManager) checkLoads() {
 	if manager.network.AllClientsLoaded() {
 		manager.state = Play
 		manager.gameRunner.RunRound()
 	}
 }
 
-func (manager *gameManager) checkSubmissions() {
+func (manager *GameManager) checkSubmissions() {
 	if !manager.network.AllClientsSubmitted() {
 		return
 	}
@@ -152,7 +158,7 @@ func (manager *gameManager) checkSubmissions() {
 	}
 }
 
-func (manager *gameManager) broadcastLoadNextRoundCmd() {
+func (manager *GameManager) broadcastLoadNextRoundCmd() {
 	round := manager.gameRunner.GetCurrentRound() + 1
 
 	challenge, ok := manager.gameData.GetChallenge(round)

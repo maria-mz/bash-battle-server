@@ -1,4 +1,4 @@
-package server
+package event_builder
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ func TestBuildPlayerJoinedEvent(t *testing.T) {
 
 	p.SetRoundScore(s1)
 
-	event := buildPlayerJoinedEvent(p)
+	event := BuildPlayerJoinedEvent(p)
 
 	assert.NotNil(t, event)
 	assert.NotNil(t, event.GetPlayerJoined())
@@ -28,7 +28,7 @@ func TestBuildPlayerLeftEvent(t *testing.T) {
 
 	p.SetRoundScore(s1)
 
-	event := buildPlayerLeftEvent(p)
+	event := BuildPlayerLeftEvent(p)
 
 	assert.NotNil(t, event)
 	assert.NotNil(t, event.GetPlayerLeft())
@@ -39,7 +39,7 @@ func TestBuildCountingDownEvent(t *testing.T) {
 	round := 1
 	startsAt := time.Now()
 
-	event := buildCountingDownEvent(round, startsAt)
+	event := BuildCountingDownEvent(round, startsAt)
 
 	assert.NotNil(t, event)
 	assert.NotNil(t, event.GetCountingDown())
@@ -52,7 +52,7 @@ func TestBuildRoundStartedEvent(t *testing.T) {
 	round := 1
 	endsAt := time.Now()
 
-	event := buildRoundStartedEvent(round, endsAt)
+	event := BuildRoundStartedEvent(round, endsAt)
 
 	assert.NotNil(t, event)
 	assert.NotNil(t, event.GetRoundStarted())
@@ -68,7 +68,7 @@ func TestBuildLoadRoundEvent(t *testing.T) {
 		// TODO: Add file paths and check bytes in pb message
 	}
 
-	event := buildLoadRoundEvent(round, challenge)
+	event := BuildLoadRoundEvent(round, challenge)
 
 	assert.NotNil(t, event)
 	assert.NotNil(t, event.GetLoadRound())
@@ -77,7 +77,7 @@ func TestBuildLoadRoundEvent(t *testing.T) {
 }
 
 func TestBuildSubmitRoundScoreEvent(t *testing.T) {
-	event := buildSubmitRoundScoreEvent()
+	event := BuildSubmitRoundScoreEvent()
 
 	assert.NotNil(t, event)
 
@@ -88,7 +88,7 @@ func TestBuildSubmitRoundScoreEvent(t *testing.T) {
 }
 
 func TestBuildGameOverEvent(t *testing.T) {
-	event := buildGameOverEvent()
+	event := BuildGameOverEvent()
 
 	assert.NotNil(t, event)
 

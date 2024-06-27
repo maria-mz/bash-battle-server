@@ -7,7 +7,6 @@ import (
 	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/game"
 	"github.com/maria-mz/bash-battle-server/log"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type state int
@@ -66,7 +65,7 @@ func (manager *gameManager) handleRunnerEvents() {
 
 		case game.RoundEnded:
 			manager.state = Submission
-			manager.requestClientsToSubmitScores()
+			manager.broadcastSubmitScoreCmd(round)
 
 		case game.GameDone:
 			return
@@ -93,7 +92,7 @@ func (manager *gameManager) AddClient(client *client) error {
 
 	if manager.gameData.IsGameFull() {
 		manager.state = Load
-		manager.requestClientsToLoadRound(1)
+		manager.broadcastLoadRoundCmd(1)
 	}
 
 	return nil
@@ -192,94 +191,78 @@ func (manager *gameManager) checkSubmissions() {
 		manager.broadcastGameOver()
 	} else {
 		manager.state = Load
-		manager.requestClientsToLoadRound(manager.gameRunner.GetCurrentRound() + 1)
+		manager.broadcastLoadRoundCmd(manager.gameRunner.GetCurrentRound() + 1)
 	}
 }
 
 func (manager *gameManager) broadcastPlayerJoin(player *game.Player) {
-	event := &pb.Event{
-		Event: &pb.Event_PlayerJoined{
-			PlayerJoined: &pb.PlayerJoined{Player: player.ToProto()},
-		},
-	}
+	log.Logger.Info(
+		"Broadcasting event PLAYER_JOIN", "player", player.InfoString(),
+	)
 
-	log.Logger.Debug("Broadcasting 'PlayerJoined' event", "event", event)
+	event := buildPlayerJoinedEvent(player)
 	manager.broadcastEvent(event)
 }
 
-func (manager *gameManager) requestClientsToLoadRound(round int) {
+func (manager *gameManager) broadcastCountdown(round int, startsAt time.Time) {
+	log.Logger.Info(
+		"Broadcasting event COUNTING_DOWN", "round", round, "startsAt", startsAt.UTC(),
+	)
+
+	event := buildCountingDownEvent(round, startsAt)
+	manager.broadcastEvent(event)
+}
+
+func (manager *gameManager) broadcastRoundStart(round int, endsAt time.Time) {
+	log.Logger.Info(
+		"Broadcasting event ROUND_STARTED", "round", round, "endsAt", endsAt.UTC(),
+	)
+
+	event := buildRoundStartedEvent(round, endsAt)
+	manager.broadcastEvent(event)
+}
+
+func (manager *gameManager) broadcastGameOver() {
+	log.Logger.Info("Broadcasting event GAME_OVER")
+
+	event := buildGameOverEvent()
+	manager.broadcastEvent(event)
+}
+
+func (manager *gameManager) broadcastLoadRoundCmd(round int) {
 	challenge, ok := manager.gameData.GetChallenge(round)
 	if !ok {
 		return
 	}
 
-	event := &pb.Event{
-		Event: &pb.Event_LoadRound{
-			LoadRound: &pb.LoadRound{
-				RoundNumber: int32(round),
-				Question:    challenge.Question,
-				// TODO: Add files as bytes
-			},
-		},
-	}
+	log.Logger.Info("Broadcasting command LOAD_ROUND", "round", round)
 
-	log.Logger.Debug("Broadcasting 'LoadRound' event", "event", event)
-	manager.broadcastEvent(event)
+	cmd := buildLoadRoundEvent(round, challenge)
+	manager.broadcastEvent(cmd)
 }
 
-func (manager *gameManager) broadcastCountdown(round int, startsAt time.Time) {
-	event := &pb.Event{
-		Event: &pb.Event_CountingDown{
-			CountingDown: &pb.CountingDown{
-				RoundNumber: int32(round),
-				StartsAt:    timestamppb.New(startsAt),
-			},
-		},
-	}
+func (manager *gameManager) broadcastSubmitScoreCmd(round int) {
+	log.Logger.Info("Broadcasting command SUBMIT_ROUND_SCORE", "round", round)
 
-	log.Logger.Debug("Broadcasting 'CountingDown' event", "event", event)
-	manager.broadcastEvent(event)
-}
-
-func (manager *gameManager) broadcastRoundStart(round int, endsAt time.Time) {
-	event := &pb.Event{
-		Event: &pb.Event_RoundStarted{
-			RoundStarted: &pb.RoundStarted{
-				RoundNumber: int32(round),
-				EndsAt:      timestamppb.New(endsAt),
-			},
-		},
-	}
-
-	log.Logger.Debug("Broadcasting 'RoundStarted' event", "event", event)
-	manager.broadcastEvent(event)
-}
-
-func (manager *gameManager) requestClientsToSubmitScores() {
-	event := &pb.Event{
-		Event: &pb.Event_SubmitRoundScore{},
-	}
-
-	log.Logger.Debug("Broadcasting 'SubmitRoundScore' event", "event", event)
-	manager.broadcastEvent(event)
-}
-
-func (manager *gameManager) broadcastGameOver() {
-	event := &pb.Event{
-		Event: &pb.Event_GameOver{
-			GameOver: &pb.GameOver{},
-		},
-	}
-
-	log.Logger.Debug("Broadcasting 'GameOver' event", "event", event)
-	manager.broadcastEvent(event)
+	cmd := buildSubmitRoundScoreEvent()
+	manager.broadcastEvent(cmd)
 }
 
 func (manager *gameManager) broadcastEvent(event *pb.Event) {
 	for _, client := range manager.clients {
-		if client.stream != nil {
-			log.Logger.Debug("Sending event to client", "client", client)
-			client.stream.SendEvent(event)
-		}
+		manager.sendEventToClient(event, client)
+	}
+}
+
+func (manager *gameManager) sendEventToClient(event *pb.Event, client *client) {
+	if client.stream != nil {
+		log.Logger.Info(
+			"Sent event to client", "client", client.InfoString(),
+		)
+		client.stream.SendEvent(event)
+	} else {
+		log.Logger.Info(
+			"Did not send event to client (stream is nil)", "client", client.InfoString(),
+		)
 	}
 }

@@ -1,6 +1,10 @@
 package game
 
-import pb "github.com/maria-mz/bash-battle-proto/proto"
+import (
+	"fmt"
+
+	pb "github.com/maria-mz/bash-battle-proto/proto"
+)
 
 type Score struct {
 	Round   int
@@ -42,4 +46,8 @@ func (player *Player) ToProto() *pb.Player {
 		Username: player.Name,
 		Stats:    gameStats,
 	}
+}
+
+func (player *Player) InfoString() string {
+	return fmt.Sprintf("%+v", player)
 }

@@ -26,7 +26,9 @@ func (player *Player) SetRoundScore(score Score) {
 
 // Don't know how much I like this but it is what it is
 func (player *Player) ToProto() *pb.Player {
-	gameStats := &pb.GameStats{}
+	gameStats := &pb.GameStats{
+		RoundStats: make(map[int32]*pb.RoundStats),
+	}
 
 	for round, score := range player.Scores {
 		roundStats := &pb.RoundStats{

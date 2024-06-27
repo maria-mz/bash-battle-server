@@ -1,6 +1,10 @@
 package game
 
-import "github.com/maria-mz/bash-battle-server/config"
+import (
+	"fmt"
+
+	"github.com/maria-mz/bash-battle-server/config"
+)
 
 type FilePath string
 
@@ -8,6 +12,10 @@ type Challenge struct {
 	Question   string
 	InputFile  FilePath
 	OutputFile FilePath
+}
+
+func (challenge *Challenge) InfoString() string {
+	return fmt.Sprintf("%+v", challenge)
 }
 
 // TODO: temporary, implement real functionality, randomly assign rounds, use db

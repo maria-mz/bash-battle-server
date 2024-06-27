@@ -98,7 +98,7 @@ func (s *Server) Stream(token string, streamSrv proto.BashBattle_StreamServer) e
 	stream := NewStream(streamSrv)
 	client.stream = stream
 
-	err := s.gameManager.ListenToClientStream(client) // Blocking
+	err := s.gameManager.ListenForClientMsgs(client.username) // Blocking
 
 	return err
 }

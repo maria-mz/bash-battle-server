@@ -7,12 +7,12 @@ import (
 )
 
 func TestNewBitmap(t *testing.T) {
-	bitmap := NewClientAckBitmap()
+	bitmap := NewActivityBitmap()
 	assert.NotNil(t, bitmap)
 }
 
 func TestBitmapSetAck(t *testing.T) {
-	bitmap := NewClientAckBitmap()
+	bitmap := NewActivityBitmap()
 
 	bitmap.SetLoadAck("client-1", true)
 	bitmap.SetLoadAck("client-2", true)
@@ -23,7 +23,7 @@ func TestBitmapSetAck(t *testing.T) {
 }
 
 func TestBitmapResetAcks(t *testing.T) {
-	bitmap := NewClientAckBitmap()
+	bitmap := NewActivityBitmap()
 
 	bitmap.SetLoadAck("client-1", true)
 	bitmap.SetSubmissionAck("client-1", true)
@@ -34,7 +34,7 @@ func TestBitmapResetAcks(t *testing.T) {
 }
 
 func TestBitmapPop(t *testing.T) {
-	bitmap := NewClientAckBitmap()
+	bitmap := NewActivityBitmap()
 
 	bitmap.SetLoadAck("client-1", true)
 	bitmap.SetLoadAck("client-2", true)

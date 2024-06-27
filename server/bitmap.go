@@ -1,19 +1,19 @@
 package server
 
-type ClientAck int
+type ClientActivity int
 
 const (
-	AckLoad ClientAck = iota
+	AckLoad ClientActivity = iota
 	AckSubmission
 )
 
-type ClientAckStatusBitmap map[string][]bool
+type ActivityBitmap map[string][]bool
 
-func NewClientAckBitmap() ClientAckStatusBitmap {
+func NewActivityBitmap() ActivityBitmap {
 	return make(map[string][]bool)
 }
 
-func (bitmap ClientAckStatusBitmap) SetLoadAck(clientID string, loaded bool) {
+func (bitmap ActivityBitmap) SetLoadAck(clientID string, loaded bool) {
 	if _, ok := bitmap[clientID]; !ok {
 		bitmap[clientID] = make([]bool, 2)
 	}
@@ -21,7 +21,7 @@ func (bitmap ClientAckStatusBitmap) SetLoadAck(clientID string, loaded bool) {
 	bitmap[clientID][AckLoad] = loaded
 }
 
-func (bitmap ClientAckStatusBitmap) SetSubmissionAck(clientID string, submitted bool) {
+func (bitmap ActivityBitmap) SetSubmissionAck(clientID string, submitted bool) {
 	if _, ok := bitmap[clientID]; !ok {
 		bitmap[clientID] = make([]bool, 2)
 	}
@@ -29,18 +29,18 @@ func (bitmap ClientAckStatusBitmap) SetSubmissionAck(clientID string, submitted 
 	bitmap[clientID][AckSubmission] = submitted
 }
 
-func (bitmap ClientAckStatusBitmap) ResetAcks() {
+func (bitmap ActivityBitmap) ResetAcks() {
 	for _, row := range bitmap {
 		row[AckLoad] = false
 		row[AckSubmission] = false
 	}
 }
 
-func (bitmap ClientAckStatusBitmap) Pop(clientID string) {
+func (bitmap ActivityBitmap) Pop(clientID string) {
 	delete(bitmap, clientID)
 }
 
-func (bitmap ClientAckStatusBitmap) CountAcks(ack ClientAck) int {
+func (bitmap ActivityBitmap) CountAcks(ack ClientActivity) int {
 	count := 0
 
 	for _, row := range bitmap {
@@ -50,4 +50,8 @@ func (bitmap ClientAckStatusBitmap) CountAcks(ack ClientAck) int {
 	}
 
 	return count
+}
+
+func (bitmap ActivityBitmap) GetStatus(ack ClientActivity, clientID string) bool {
+	return bitmap[clientID][ack]
 }

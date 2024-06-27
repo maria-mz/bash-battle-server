@@ -7,67 +7,65 @@ import (
 )
 
 func TestNewGameManager(t *testing.T) {
-	gameManger := NewGameManager(testConfig.GameConfig)
+	manager := NewGameManager(testConfig.GameConfig)
 
-	assert.NotNil(t, gameManger)
-	assert.NotNil(t, gameManger.clients)
-	assert.NotNil(t, gameManger.clientAckBitmap)
-	assert.NotNil(t, gameManger.gameData)
-	assert.NotNil(t, gameManger.gameRunner)
-	assert.Equal(t, gameManger.state, Lobby)
-	assert.Equal(t, len(gameManger.clients), 0)
+	assert.NotNil(t, manager)
+	assert.NotNil(t, manager.network)
+	assert.NotNil(t, manager.gameData)
+	assert.NotNil(t, manager.gameRunner)
+	assert.Equal(t, manager.state, Lobby)
 }
 
 func TestAddClient_Normal(t *testing.T) {
-	gameManager := NewGameManager(testConfig.GameConfig)
+	manager := NewGameManager(testConfig.GameConfig)
 
-	client1 := &client{username: "player-1", active: true}
+	c1 := &client{username: "player-1", active: true}
 
-	err := gameManager.AddClient(client1)
+	err := manager.AddClient(c1)
 
 	assert.Nil(t, err)
-	assert.Equal(t, gameManager.state, Lobby)
-	assert.True(t, gameManager.gameData.HasPlayer("player-1"))
+	assert.Equal(t, manager.state, Lobby)
+	assert.True(t, manager.gameData.HasPlayer("player-1"))
 }
 
 func TestAddClient_GameBecomesFull(t *testing.T) {
-	gameManager := NewGameManager(testConfig.GameConfig)
+	manager := NewGameManager(testConfig.GameConfig)
 
-	client1 := &client{username: "player-1", active: true}
-	client2 := &client{username: "player-2", active: true}
-	client3 := &client{username: "player-3", active: true}
+	c1 := &client{username: "player-1", active: true}
+	c2 := &client{username: "player-2", active: true}
+	c3 := &client{username: "player-3", active: true}
 
-	gameManager.AddClient(client1)
-	gameManager.AddClient(client2)
-	gameManager.AddClient(client3)
+	manager.AddClient(c1)
+	manager.AddClient(c2)
+	manager.AddClient(c3)
 
-	assert.Equal(t, gameManager.state, Load)
+	assert.Equal(t, manager.state, Load)
 }
 
 func TestAddClient_ErrJoinOnGameStarted(t *testing.T) {
-	gameManager := NewGameManager(testConfig.GameConfig)
+	manager := NewGameManager(testConfig.GameConfig)
 
-	client1 := &client{username: "player-1", active: true}
-	client2 := &client{username: "player-2", active: true}
-	client3 := &client{username: "player-3", active: true}
-	client4 := &client{username: "player-4", active: true}
+	c1 := &client{username: "player-1", active: true}
+	c2 := &client{username: "player-2", active: true}
+	c3 := &client{username: "player-3", active: true}
+	c4 := &client{username: "player-4", active: true}
 
-	gameManager.AddClient(client1)
-	gameManager.AddClient(client2)
-	gameManager.AddClient(client3)
-	err := gameManager.AddClient(client4)
+	manager.AddClient(c1)
+	manager.AddClient(c2)
+	manager.AddClient(c3)
+	err := manager.AddClient(c4)
 
 	assert.Equal(t, err, ErrJoinOnGameStarted)
 }
 
 func TestAddClient_ErrUsernameTaken(t *testing.T) {
-	gameManager := NewGameManager(testConfig.GameConfig)
+	manager := NewGameManager(testConfig.GameConfig)
 
-	client1 := &client{username: "player-1", active: true}
-	client2 := &client{username: "player-1", active: true}
+	c1 := &client{username: "player-1", active: true}
+	c2 := &client{username: "player-1", active: true}
 
-	gameManager.AddClient(client1)
-	err := gameManager.AddClient(client2)
+	manager.AddClient(c1)
+	err := manager.AddClient(c2)
 
-	assert.Equal(t, err, ErrUsernameTaken)
+	assert.Equal(t, ErrUsernameTaken, err)
 }

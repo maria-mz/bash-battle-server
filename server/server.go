@@ -16,32 +16,30 @@ var ErrStreamAlreadyActive = errors.New("stream is already active")
 var ErrUsernameTaken = errors.New("a player with this name already exists")
 
 type Server struct {
-	config      config.Config
-	clients     *utils.Registry[string, network.Client]
-	gameManager *game_manager.GameManager
+	config       config.Config
+	clients      map[string]*network.Client
+	usernamePool utils.Set[string]
+	gameManager  *game_manager.GameManager
 }
 
 func NewServer(config config.Config) *Server {
 	return &Server{
-		config:      config,
-		clients:     utils.NewRegistry[string, network.Client](),
-		gameManager: game_manager.NewGameManager(config.GameConfig),
+		config:       config,
+		clients:      make(map[string]*network.Client),
+		usernamePool: utils.NewSet[string](),
+		gameManager:  game_manager.NewGameManager(config.GameConfig),
 	}
 }
 
 func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse, error) {
 	log.Logger.Info("New connect request", "request", request)
 
-	token := utils.GenerateToken()
-
-	nameQuery := func(client *network.Client) bool {
-		return client.Username == request.Username
-	}
-
-	if s.clients.RecordsMatchingQuery(nameQuery) > 0 {
+	if s.usernamePool.Contains(request.Username) {
 		log.Logger.Warn("Connect failed", "err", ErrUsernameTaken)
 		return nil, ErrUsernameTaken
 	}
+
+	token := utils.GenerateToken()
 
 	client := &network.Client{
 		Token:    token,
@@ -49,7 +47,8 @@ func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse,
 		Active:   true,
 	}
 
-	s.clients.WriteRecord(client.Token, client)
+	s.clients[client.Token] = client
+	s.usernamePool.Add(request.Username)
 
 	log.Logger.Info("Connected new client", "client", client)
 
@@ -59,7 +58,7 @@ func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse,
 func (s *Server) JoinGame(token string) error {
 	log.Logger.Info("New join game request")
 
-	client, ok := s.clients.GetRecord(token)
+	client, ok := s.clients[token]
 
 	if !ok {
 		log.Logger.Info("Failed to join game", "err", ErrTokenNotRecognized)
@@ -79,7 +78,8 @@ func (s *Server) JoinGame(token string) error {
 }
 
 func (s *Server) GetGameConfig(token string) (*proto.GameConfig, error) {
-	if !s.clients.HasRecord(token) {
+	_, ok := s.clients[token]
+	if !ok {
 		return nil, ErrTokenNotRecognized
 	}
 
@@ -93,8 +93,7 @@ func (s *Server) GetGameConfig(token string) (*proto.GameConfig, error) {
 }
 
 func (s *Server) Stream(token string, streamSrv proto.BashBattle_StreamServer) error {
-	client, ok := s.clients.GetRecord(token)
-
+	client, ok := s.clients[token]
 	if !ok {
 		return ErrTokenNotRecognized
 	}

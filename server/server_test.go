@@ -47,7 +47,8 @@ func (test connectTest) run(t *testing.T) {
 		assert.NotNil(t, resp)
 		assert.NotEqual(t, resp.Token, "")
 		assert.Nil(t, err)
-		assert.True(t, server.clients.HasRecord(resp.Token))
+		_, ok := server.clients[resp.Token]
+		assert.True(t, ok)
 	}
 }
 

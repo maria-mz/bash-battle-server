@@ -3,6 +3,8 @@ package config
 import (
 	"encoding/json"
 	"os"
+
+	"github.com/maria-mz/bash-battle-proto/proto"
 )
 
 type GameConfig struct {
@@ -12,6 +14,16 @@ type GameConfig struct {
 	CountdownDuration int
 	Difficulty        int
 	FileSize          int
+}
+
+func (config *GameConfig) ToProto() *proto.GameConfig {
+	return &proto.GameConfig{
+		MaxPlayers:   int32(config.MaxPlayers),
+		Rounds:       int32(config.Rounds),
+		RoundSeconds: int32(config.RoundDuration),
+		Difficulty:   proto.Difficulty(config.Difficulty),
+		FileSize:     proto.FileSize(config.FileSize),
+	}
 }
 
 type Config struct {

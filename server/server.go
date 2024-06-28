@@ -83,13 +83,7 @@ func (s *Server) GetGameConfig(token string) (*proto.GameConfig, error) {
 		return nil, ErrTokenNotRecognized
 	}
 
-	return &proto.GameConfig{
-		MaxPlayers:   int32(s.config.GameConfig.MaxPlayers),
-		Rounds:       int32(s.config.GameConfig.Rounds),
-		RoundSeconds: int32(s.config.GameConfig.RoundDuration),
-		Difficulty:   proto.Difficulty(s.config.GameConfig.Difficulty),
-		FileSize:     proto.FileSize(s.config.GameConfig.FileSize),
-	}, nil
+	return s.config.GameConfig.ToProto(), nil
 }
 
 func (s *Server) Stream(token string, streamSrv proto.BashBattle_StreamServer) error {

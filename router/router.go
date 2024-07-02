@@ -67,6 +67,18 @@ func (s *ServerRouter) GetGameConfig(ctx context.Context, _ *emptypb.Empty) (*pr
 	return config, err
 }
 
+func (s *ServerRouter) GetPlayers(ctx context.Context, _ *emptypb.Empty) (*proto.Players, error) {
+	token, ok := s.getToken(ctx)
+
+	if !ok {
+		return &proto.Players{}, ErrTokenNotFound
+	}
+
+	players, err := s.server.GetPlayers(token)
+
+	return players, err
+}
+
 func (s *ServerRouter) Stream(stream proto.BashBattle_StreamServer) error {
 	token, ok := s.getToken(stream.Context())
 

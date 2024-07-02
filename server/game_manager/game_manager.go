@@ -128,6 +128,10 @@ func (gm *GameManager) AddClient(client *network.Client) error {
 	return nil
 }
 
+func (gm *GameManager) GetPlayers() []*game.Player {
+	return gm.gameData.GetPlayers()
+}
+
 func (gm *GameManager) ListenForClientMsgs(client *network.Client) error {
 	if gm.state == Done {
 		return ErrStreamOnGameOver

@@ -30,6 +30,16 @@ func (data *GameData) GetPlayer(name string) (Player, bool) {
 	return *player, ok
 }
 
+func (data *GameData) GetPlayers() []*Player {
+	players := make([]*Player, len(data.Players))
+
+	for _, player := range data.Players {
+		players = append(players, player)
+	}
+
+	return players
+}
+
 func (data *GameData) NumPlayers() int {
 	return len(data.Players)
 }

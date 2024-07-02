@@ -85,6 +85,22 @@ func (s *Server) GetGameConfig(token string) (*proto.GameConfig, error) {
 	return s.config.GameConfig.ToProto(), nil
 }
 
+func (s *Server) GetPlayers(token string) (*proto.Players, error) {
+	_, ok := s.clients[token]
+	if !ok {
+		return nil, ErrTokenNotRecognized
+	}
+
+	players := s.gameManager.GetPlayers()
+	protoPlayers := &proto.Players{Players: make([]*proto.Player, len(players))}
+
+	for _, player := range players {
+		protoPlayers.Players = append(protoPlayers.Players, player.ToProto())
+	}
+
+	return protoPlayers, nil
+}
+
 func (s *Server) Stream(token string, streamSrv proto.BashBattle_StreamServer) error {
 	client, ok := s.clients[token]
 	if !ok {

@@ -21,7 +21,6 @@ func TestNewNetwork(t *testing.T) {
 	assert.NotNil(t, network)
 	assert.NotNil(t, clientMsgs)
 	assert.NotNil(t, network.clients)
-	assert.NotNil(t, network.activityBitmap)
 }
 
 func TestAddClient_Ok(t *testing.T) {
@@ -57,13 +56,13 @@ func TestBroadcast(t *testing.T) {
 	c1 := &Client{
 		Username: "player-1",
 		Stream:   NewStream(mss1),
-		Active:   true,
+		meta:     ClientMeta{Active: true},
 	}
 	c2 := &Client{Username: "player-2"} // No stream
 	c3 := &Client{
 		Username: "player-3",
 		Stream:   NewStream(mss2),
-		Active:   true,
+		meta:     ClientMeta{Active: true},
 	}
 
 	network.AddClient(c1)
@@ -87,7 +86,7 @@ func TestClientAck(t *testing.T) {
 	c := &Client{
 		Username: "player-1",
 		Stream:   NewStream(mss),
-		Active:   true,
+		meta:     ClientMeta{Active: true},
 	}
 
 	go func() {
@@ -103,7 +102,6 @@ func TestClientAck(t *testing.T) {
 
 		assert.Equal(t, c.Username, clientMsg.Username)
 		assert.Equal(t, ackMsg, clientMsg.Msg)
-		assert.True(t, network.GetClientLoadStatus(c.Username))
 
 		mss.Close() // Actually ends test goroutine
 	}()

@@ -36,7 +36,7 @@ func TestNewGameManager(t *testing.T) {
 func TestAddClient_Normal(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &network.Client{Username: "player-1", Active: true}
+	c1 := &network.Client{Username: "player-1"}
 
 	err := manager.AddClient(c1)
 
@@ -48,24 +48,24 @@ func TestAddClient_Normal(t *testing.T) {
 func TestAddClient_GameBecomesFull(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &network.Client{Username: "player-1", Active: true}
-	c2 := &network.Client{Username: "player-2", Active: true}
-	c3 := &network.Client{Username: "player-3", Active: true}
+	c1 := &network.Client{Username: "player-1"}
+	c2 := &network.Client{Username: "player-2"}
+	c3 := &network.Client{Username: "player-3"}
 
 	manager.AddClient(c1)
 	manager.AddClient(c2)
 	manager.AddClient(c3)
 
-	assert.Equal(t, manager.state, Load)
+	assert.Equal(t, Load, manager.state)
 }
 
 func TestAddClient_ErrJoinOnGameStarted(t *testing.T) {
 	manager := NewGameManager(testConfig.GameConfig)
 
-	c1 := &network.Client{Username: "player-1", Active: true}
-	c2 := &network.Client{Username: "player-2", Active: true}
-	c3 := &network.Client{Username: "player-3", Active: true}
-	c4 := &network.Client{Username: "player-4", Active: true}
+	c1 := &network.Client{Username: "player-1"}
+	c2 := &network.Client{Username: "player-2"}
+	c3 := &network.Client{Username: "player-3"}
+	c4 := &network.Client{Username: "player-4"}
 
 	manager.AddClient(c1)
 	manager.AddClient(c2)

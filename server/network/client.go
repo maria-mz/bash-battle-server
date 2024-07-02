@@ -1,14 +1,17 @@
 package network
 
-import (
-	"fmt"
-)
+import "fmt"
+
+type ClientMeta struct {
+	Active bool
+}
 
 type Client struct {
 	Token    string
 	Username string
-	Active   bool
 	Stream   *Stream
+
+	meta ClientMeta // TODO: make public ? or read only
 }
 
 func (client *Client) InfoString() string {

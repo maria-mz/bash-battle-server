@@ -5,7 +5,6 @@ go 1.22.2
 require (
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/charmbracelet/log v0.4.0
-	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/maria-mz/bash-battle-proto v0.0.0-20240623180313-5a2f693499c0
 	github.com/stretchr/testify v1.9.0

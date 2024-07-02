@@ -44,7 +44,6 @@ func (s *Server) Connect(request *proto.ConnectRequest) (*proto.ConnectResponse,
 	client := &network.Client{
 		Token:    token,
 		Username: request.Username,
-		Active:   true,
 	}
 
 	s.clients[client.Token] = client
@@ -99,7 +98,7 @@ func (s *Server) Stream(token string, streamSrv proto.BashBattle_StreamServer) e
 	stream := network.NewStream(streamSrv)
 	client.Stream = stream
 
-	err := s.gameManager.ListenForClientMsgs(client.Username) // Blocking
+	err := s.gameManager.ListenForClientMsgs(client) // Blocking
 
 	return err
 }

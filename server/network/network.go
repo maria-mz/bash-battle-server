@@ -18,23 +18,20 @@ type ClientMsg struct {
 }
 
 type Network struct {
-	clients        map[string]*Client
-	clientMsgs     chan<- ClientMsg
-	activityBitmap ActivityBitmap
+	clients    map[string]*Client
+	clientMsgs chan<- ClientMsg
 }
 
 func NewNetwork() (*Network, <-chan ClientMsg) {
 	clients := make(map[string]*Client)
-	bitmap := NewActivityBitmap()
-	ch := make(chan ClientMsg)
+	clientMsgs := make(chan ClientMsg)
 
 	net := &Network{
-		clients:        clients,
-		activityBitmap: bitmap,
-		clientMsgs:     ch,
+		clients:    clients,
+		clientMsgs: clientMsgs,
 	}
 
-	return net, ch
+	return net, clientMsgs
 }
 
 func (net *Network) AddClient(client *Client) error {
@@ -48,6 +45,7 @@ func (net *Network) AddClient(client *Client) error {
 
 func (net *Network) ListenForClientMsgs(username string) error {
 	client, ok := net.clients[username]
+
 	if !ok {
 		return ErrClientNotFound
 	}
@@ -55,7 +53,11 @@ func (net *Network) ListenForClientMsgs(username string) error {
 	go net.handleClientMsgs(client)
 	go client.Stream.Recv()
 
+	client.meta.Active = true
+
 	msg := <-client.Stream.EndStreamMsgs // blocking
+
+	client.meta.Active = false
 
 	if msg.Err != nil {
 		log.Logger.Warn(
@@ -72,21 +74,13 @@ func (net *Network) ListenForClientMsgs(username string) error {
 
 func (net *Network) handleClientMsgs(client *Client) {
 	for msg := range client.Stream.AckMsgs {
-		client.Active = true
-
 		switch msg.Ack.(type) {
 
 		case *pb.AckMsg_RoundLoaded:
-			log.Logger.Info(
-				"Client loaded round [ACK]", "client", client.Username,
-			)
-			net.activityBitmap.SetLoadAck(client.Username, true)
+			log.Logger.Info("Client loaded round", "client", client.Username)
 
 		case *pb.AckMsg_RoundSubmission:
-			log.Logger.Info(
-				"Client made a submission [ACK]", "client", client.Username,
-			)
-			net.activityBitmap.SetSubmissionAck(client.Username, true)
+			log.Logger.Info("Client made a submission", "client", client.Username)
 		}
 
 		net.clientMsgs <- ClientMsg{client.Username, msg}
@@ -104,7 +98,9 @@ func (net *Network) BroadcastPlayerJoin(player *game.Player) {
 
 func (net *Network) BroadcastCountdown(round int, startsAt time.Time) {
 	log.Logger.Info(
-		"Broadcasting event COUNTING_DOWN", "round", round, "startsAt", startsAt.UTC(),
+		"Broadcasting event COUNTING_DOWN",
+		"round", round,
+		"startsAt", startsAt.UTC(),
 	)
 
 	event := BuildCountingDownEvent(round, startsAt)
@@ -113,7 +109,9 @@ func (net *Network) BroadcastCountdown(round int, startsAt time.Time) {
 
 func (net *Network) BroadcastRoundStart(round int, endsAt time.Time) {
 	log.Logger.Info(
-		"Broadcasting event ROUND_STARTED", "round", round, "endsAt", endsAt.UTC(),
+		"Broadcasting event ROUND_STARTED",
+		"round", round,
+		"endsAt", endsAt.UTC(),
 	)
 
 	event := BuildRoundStartedEvent(round, endsAt)
@@ -127,57 +125,70 @@ func (net *Network) BroadcastGameOver() {
 	net.BroadcastEvent(event)
 }
 
-func (net *Network) BroadcastLoadRoundCmd(round int, challenge game.Challenge) {
-	log.Logger.Info(
-		"Broadcasting command LOAD_ROUND", "round", round, "challenge", challenge.InfoString(),
+func (net *Network) BroadcastLoadRound(round int, challenge game.Challenge, callback func()) {
+	net.broadcastMultipleTimes(
+		func() { net.broadcastLoadRound(round, challenge) },
 	)
 
-	cmd := BuildLoadRoundEvent(round, challenge)
-	net.BroadcastEvent(cmd)
+	callback()
 }
 
-func (net *Network) BroadcastSubmitScoreCmd(round int) {
-	log.Logger.Info("Broadcasting command SUBMIT_ROUND_SCORE", "round", round)
+func (net *Network) BroadcastSubmitScore(round int, callback func()) {
+	net.broadcastMultipleTimes(
+		func() { net.broadcastSubmitScore(round) },
+	)
 
-	cmd := BuildSubmitRoundScoreEvent()
-	net.BroadcastEvent(cmd)
+	callback()
+}
+
+func (net *Network) broadcastLoadRound(round int, challenge game.Challenge) {
+	log.Logger.Info(
+		"Broadcasting event LOAD_ROUND",
+		"round", round,
+		"challenge", challenge.InfoString(),
+	)
+
+	event := BuildLoadRoundEvent(round, challenge)
+	net.BroadcastEvent(event)
+}
+
+func (net *Network) broadcastSubmitScore(round int) {
+	log.Logger.Info("Broadcasting event SUBMIT_ROUND_SCORE", "round", round)
+
+	event := BuildSubmitRoundScoreEvent()
+	net.BroadcastEvent(event)
 }
 
 func (net *Network) BroadcastEvent(event *pb.Event) {
 	for _, client := range net.clients {
-		net.sendEventToClient(event, client)
+		net.SendEventToClient(event, client)
 	}
 }
 
-func (net *Network) sendEventToClient(event *pb.Event, client *Client) {
-	if client.Stream != nil {
+func (net *Network) broadcastMultipleTimes(broadcast func()) {
+	ticker := time.NewTicker(1 * time.Second) // TODO: Use constant
+	count := 0
+
+	for range ticker.C {
+		if count == 3 { // TODO: Use constant
+			return
+		}
+
+		broadcast()
+		count++
+	}
+}
+
+func (net *Network) SendEventToClient(event *pb.Event, client *Client) {
+	if client.meta.Active {
 		log.Logger.Info(
 			"Sent event to client", "client", client.Username,
 		)
 		client.Stream.SendEvent(event)
 	} else {
 		log.Logger.Info(
-			"Did not send event to client (stream is nil)", "client", client.Username,
+			"Did not send event to client (stream is nil)",
+			"client", client.Username,
 		)
 	}
-}
-
-func (net *Network) AllClientsLoaded() bool {
-	return net.activityBitmap.CountAcks(AckLoad) == len(net.clients)
-}
-
-func (net *Network) AllClientsSubmitted() bool {
-	return net.activityBitmap.CountAcks(AckSubmission) == len(net.clients)
-}
-
-func (net *Network) GetClientLoadStatus(username string) bool {
-	return net.activityBitmap.GetStatus(AckLoad, username)
-}
-
-func (net *Network) GetClientSubmissionStatus(username string) bool {
-	return net.activityBitmap.GetStatus(AckSubmission, username)
-}
-
-func (net *Network) ResetAcks() {
-	net.activityBitmap.ResetAcks()
 }

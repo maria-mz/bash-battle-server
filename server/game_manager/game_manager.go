@@ -7,6 +7,7 @@ import (
 	pb "github.com/maria-mz/bash-battle-proto/proto"
 	"github.com/maria-mz/bash-battle-server/config"
 	"github.com/maria-mz/bash-battle-server/game"
+	"github.com/maria-mz/bash-battle-server/log"
 	"github.com/maria-mz/bash-battle-server/server/network"
 )
 
@@ -36,40 +37,37 @@ type GameManager struct {
 }
 
 func NewGameManager(config config.GameConfig) *GameManager {
-	network, clientMsgs := network.NewNetwork()
+	broadcaster, clientMsgs := network.NewNetwork()
 	gameData := game.NewGameData(config)
 	gameRunner, gameRunnerEvents := game.NewGameRunner(gameData)
 
-	manager := &GameManager{
-		network:          network,
+	gm := &GameManager{
+		network:          broadcaster,
 		clientMsgs:       clientMsgs,
 		gameData:         gameData,
 		gameRunner:       gameRunner,
 		gameRunnerEvents: gameRunnerEvents,
 	}
 
-	go manager.handleRunnerEvents()
-	go manager.handleClientMsgs()
+	go gm.handleRunnerEvents()
+	go gm.handleClientMsgs()
 
-	return manager
+	return gm
 }
 
-func (manager *GameManager) handleRunnerEvents() {
-	for event := range manager.gameRunnerEvents {
-		round := manager.gameRunner.GetCurrentRound()
+func (gm *GameManager) handleRunnerEvents() {
+	for event := range gm.gameRunnerEvents {
+		round := gm.gameRunner.GetCurrentRound()
 
 		switch event {
 		case game.CountingDown:
-			roundStartsAt := time.Now().Add(manager.gameData.GetCountdownDuration())
-			manager.network.BroadcastCountdown(round, roundStartsAt)
+			gm.onCountingDown(round)
 
 		case game.RoundStarted:
-			roundEndsAt := time.Now().Add(manager.gameData.GetRoundDuration())
-			manager.network.BroadcastRoundStart(round, roundEndsAt)
+			gm.onRoundStarted(round)
 
 		case game.RoundEnded:
-			manager.state = Submission
-			manager.network.BroadcastSubmitScoreCmd(round)
+			gm.onRoundEnded(round)
 
 		case game.GameDone:
 			return
@@ -77,91 +75,103 @@ func (manager *GameManager) handleRunnerEvents() {
 	}
 }
 
-func (manager *GameManager) AddClient(client *network.Client) error {
-	if manager.state != Lobby {
+func (gm *GameManager) onCountingDown(round int) {
+	roundStartsAt := time.Now().Add(gm.gameData.GetCountdownDuration())
+	go gm.network.BroadcastCountdown(round, roundStartsAt)
+}
+
+func (gm *GameManager) onRoundStarted(round int) {
+	roundEndsAt := time.Now().Add(gm.gameData.GetRoundDuration())
+	go gm.network.BroadcastRoundStart(round, roundEndsAt)
+}
+
+func (gm *GameManager) onRoundEnded(round int) {
+	gm.state = Submission
+	go gm.network.BroadcastSubmitScore(round, gm.onSubmitScoreBroadcasted)
+}
+
+func (gm *GameManager) onSubmitScoreBroadcasted() {
+	if gm.gameRunner.IsFinalRound() {
+		gm.state = Done
+		gm.network.BroadcastGameOver()
+	} else {
+		gm.state = Load
+		gm.loadNextRound()
+	}
+}
+
+func (gm *GameManager) onLoadRoundBroadcasted() {
+	gm.state = Play
+	gm.gameRunner.RunRound()
+}
+
+func (gm *GameManager) AddClient(client *network.Client) error {
+	if gm.state != Lobby {
 		return ErrJoinOnGameStarted
 	}
 
-	if err := manager.network.AddClient(client); err != nil {
+	err := gm.network.AddClient(client)
+	if err != nil {
 		return err
 	}
 
 	player := game.NewPlayer(client.Username)
 
-	manager.gameData.AddPlayer(player)
-	manager.network.BroadcastPlayerJoin(player)
+	gm.gameData.AddPlayer(player)
+	gm.network.BroadcastPlayerJoin(player)
 
-	if manager.gameData.IsGameFull() {
-		manager.state = Load
-		manager.broadcastLoadNextRoundCmd()
+	if gm.gameData.IsGameFull() {
+		gm.state = Load
+		gm.loadNextRound()
 	}
 
 	return nil
 }
 
-func (manager *GameManager) ListenForClientMsgs(username string) error {
-	err := manager.network.ListenForClientMsgs(username) // Blocking
+func (gm *GameManager) ListenForClientMsgs(client *network.Client) error {
+	if gm.state == Done {
+		return ErrStreamOnGameOver
+	}
+	err := gm.network.ListenForClientMsgs(client.Username) // Blocking
 	return err
 }
 
-func (manager *GameManager) handleClientMsgs() {
-	for msg := range manager.clientMsgs {
+func (gm *GameManager) handleClientMsgs() {
+	for msg := range gm.clientMsgs {
 		switch ack := msg.Msg.GetAck().(type) {
 
 		case *pb.AckMsg_RoundLoaded:
-			if manager.state != Load {
-				continue
-			}
-			manager.checkLoads()
+			continue // do nothing
 
 		case *pb.AckMsg_RoundSubmission:
-			if manager.state != Submission {
-				return
+			if gm.state == Submission {
+				gm.makeSubmission(ack.RoundSubmission.RoundStats, msg.Username)
 			}
-			manager.makeSubmission(ack, msg.Username)
-			manager.checkSubmissions()
 		}
 	}
 }
 
-func (manager *GameManager) makeSubmission(msg *pb.AckMsg_RoundSubmission, username string) {
+func (gm *GameManager) makeSubmission(stats *pb.RoundStats, username string) {
 	score := game.Score{
-		Round: manager.gameRunner.GetCurrentRound(),
-		Win:   msg.RoundSubmission.RoundStats.Won,
+		Round: gm.gameRunner.GetCurrentRound(),
+		Win:   stats.Won,
 	}
 
-	player, _ := manager.gameData.GetPlayer(username)
+	player, ok := gm.gameData.GetPlayer(username)
+
+	if !ok {
+		log.Logger.Fatal("failed to set score for player", "username", username)
+	}
 	player.SetRoundScore(score)
 }
 
-func (manager *GameManager) checkLoads() {
-	if manager.network.AllClientsLoaded() {
-		manager.state = Play
-		manager.gameRunner.RunRound()
-	}
-}
+func (gm *GameManager) loadNextRound() {
+	round := gm.gameRunner.GetCurrentRound() + 1
+	challenge, ok := gm.gameData.GetChallenge(round)
 
-func (manager *GameManager) checkSubmissions() {
-	if !manager.network.AllClientsSubmitted() {
-		return
+	if !ok {
+		log.Logger.Fatal("No challenge found for round", "round", round)
 	}
 
-	manager.network.ResetAcks()
-
-	if manager.gameRunner.IsFinalRound() {
-		manager.state = Done
-		manager.network.BroadcastGameOver()
-	} else {
-		manager.state = Load
-		manager.broadcastLoadNextRoundCmd()
-	}
-}
-
-func (manager *GameManager) broadcastLoadNextRoundCmd() {
-	round := manager.gameRunner.GetCurrentRound() + 1
-
-	challenge, ok := manager.gameData.GetChallenge(round)
-	if ok {
-		manager.network.BroadcastLoadRoundCmd(round, challenge)
-	}
+	go gm.network.BroadcastLoadRound(round, challenge, gm.onLoadRoundBroadcasted)
 }

@@ -52,7 +52,7 @@ func TestRunRound(t *testing.T) {
 	assert.Equal(t, 2, runner.GetCurrentRound())
 	assert.Equal(t, RoundStarted, <-ch)
 	assert.Equal(t, 2, runner.GetCurrentRound())
-	assert.Equal(t, GameDone, <-ch)
+	assert.Equal(t, RoundEnded, <-ch)
 	assert.Equal(t, 2, runner.GetCurrentRound())
 
 	// error

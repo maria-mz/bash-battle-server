@@ -68,11 +68,10 @@ func (gm *GameManager) handleRunnerEvents() {
 
 		case game.RoundEnded:
 			gm.onRoundEnded(round)
-
-		case game.GameDone:
-			return
 		}
 	}
+
+	log.Logger.Info("exiting loop!!!!!!\n")
 }
 
 func (gm *GameManager) onCountingDown(round int) {
@@ -171,7 +170,7 @@ func (gm *GameManager) makeSubmission(stats *pb.RoundStats, username string) {
 
 func (gm *GameManager) loadNextRound() {
 	round := gm.gameRunner.GetCurrentRound() + 1
-	challenge, ok := gm.gameData.GetChallenge(round)
+	challenge, ok := gm.gameData.GetChallenge(round - 1) // 0-based
 
 	if !ok {
 		log.Logger.Fatal("No challenge found for round", "round", round)

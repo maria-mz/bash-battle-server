@@ -18,11 +18,8 @@ const (
 	// RoundStarted - Timer started for the current round.
 	RoundStarted
 
-	// RoundEnded - Timer expired for the current (but not last) round.
+	// RoundEnded - Timer expired for the current round.
 	RoundEnded
-
-	// GameDone - Timer expired for the last round.
-	GameDone
 )
 
 var ErrNoRoundsLeft error = errors.New("there are no rounds left to play")
@@ -76,17 +73,12 @@ func (runner *GameRunner) run() {
 	log.Logger.Info(fmt.Sprintf("Started round %d", runner.round))
 	runner.wait(runner.GameData.GetRoundDuration())
 
+	runner.ch <- RoundEnded
+	log.Logger.Info(fmt.Sprintf("Ended round %d", runner.round))
+
 	if runner.IsFinalRound() {
-		runner.ch <- GameDone
-
-		log.Logger.Info(fmt.Sprintf("Ended round %d (final round)", runner.round))
-
 		close(runner.ch)
-		log.Logger.Info("Closed RunnerEvent channel")
-	} else {
-		runner.ch <- RoundEnded
-
-		log.Logger.Info(fmt.Sprintf("Ended round %d", runner.round))
+		log.Logger.Info("Final round done. Closed RunnerEvent channel")
 	}
 }
 
